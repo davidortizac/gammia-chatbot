@@ -1,12 +1,31 @@
-import React from 'react';
-
-const mockDocuments = [
-  { id: '1a2b', title: 'Politicas_Data_Loss_Prevention.pdf', hash: '8f2x...a1', version: 3, status: 'SYNCED', date: '2026-04-23' },
-  { id: '3c4d', title: 'Guia_Zero_Trust_Gamma.docx', hash: 'p99s...e2', version: 1, status: 'SYNCED', date: '2026-04-20' },
-  { id: '5e6f', title: 'Passwords_Produccion_OLD.pdf', hash: 'c51z...r4', version: 2, status: 'PENDING_DELETE', date: '2026-04-23' },
-];
+import React, { useState, useEffect } from 'react';
+import { FileText } from 'lucide-react';
+import { API_CONFIG } from '../config';
 
 export default function RagView() {
+  const [documents, setDocuments] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchDocuments = async () => {
+    try {
+        setIsLoading(true);
+        const res = await fetch(`${API_CONFIG.BASE_URL}/api/v1/rag/nodes`, {
+            headers: API_CONFIG.getHeaders()
+        });
+        if (res.ok) {
+            const data = await res.json();
+            setDocuments(data.documents || []);
+        }
+    } catch (error) {
+        console.error("Error fetching RAG nodes:", error);
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+      fetchDocuments();
+  }, []);
   return (
     <div className="max-w-7xl mx-auto animate-fade-in">
       <div className="flex justify-between items-end mb-8">
@@ -30,11 +49,15 @@ export default function RagView() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
-            {mockDocuments.map((doc) => (
+            {isLoading ? (
+               <tr><td colSpan="4" className="p-8 text-center text-slate-500">Cargando vectores vivos de Google Cloud...</td></tr>
+            ) : documents.length === 0 ? (
+               <tr><td colSpan="4" className="p-8 text-center text-slate-500">No hay documentos en el RAG. Ejecuta el script de inyección.</td></tr>
+            ) : documents.map((doc) => (
               <tr key={doc.id} className="hover:bg-slate-800/20 transition-colors">
                 <td className="p-4">
                   <div className="flex items-center gap-3">
-                    <span className="text-xl">?</span>
+                    <span className="text-slate-400"><FileText size={24} strokeWidth={1.5} /></span>
                     <div>
                       <p className="text-sm font-medium text-slate-200">{doc.title}</p>
                       <p className="text-xs text-slate-500 font-mono mt-0.5">Hash: {doc.hash}</p>
@@ -45,6 +68,13 @@ export default function RagView() {
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
                     v{doc.version}
                   </span>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                     {doc.tags?.map(tag => (
+                        <span key={tag} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                          #{tag}
+                        </span>
+                     ))}
+                  </div>
                 </td>
                 <td className="p-4">
                   {doc.status === 'SYNCED' ? (
@@ -76,8 +106,8 @@ export default function RagView() {
         </table>
         {/* Helper Footer */}
         <div className="bg-slate-900/80 p-4 border-t border-slate-800 text-xs text-slate-500 flex justify-between items-center">
-           <span>Mostrando 3 de 145 documentos vectorizados.</span>
-           <span>Último webhook recibido: Hoy, 09:14 AM</span>
+           <span>Mostrando {documents.length} documentos vectorizados físicos.</span>
+           <button onClick={fetchDocuments} className="hover:text-emerald-400 transition-colors">Actualizar Tabla</button>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { LayoutDashboard, Database, Wrench } from 'lucide-react';
 
 const SidebarItem = ({ icon, label, isActive, onClick }) => (
   <button 
@@ -9,7 +10,7 @@ const SidebarItem = ({ icon, label, isActive, onClick }) => (
         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
       }`}
   >
-    <span className="text-lg">{icon}</span>
+    <span className="text-lg w-5 h-5 flex items-center justify-center">{icon}</span>
     {label}
   </button>
 );
@@ -19,13 +20,13 @@ export default function Sidebar({ activeView, setActiveView }) {
     <aside className="w-64 bg-slate-900 border-r border-slate-800/80 flex flex-col z-20 shadow-2xl relative">
        {/* Brand Logo Area */}
        <div className="h-24 flex items-center px-6 border-b border-slate-800/50 mb-6">
-          <div className="flex items-center gap-3">
-             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 border border-slate-700 flex items-center justify-center shadow-lg">
-                <span className="text-emerald-400 text-xl font-bold font-mono">G</span>
+          <div className="flex items-center gap-3 w-full">
+             <div className="bg-white p-1.5 rounded-lg shadow-lg">
+                <img src="/Logo-Gamma-Ingenieros-(Negro).png" alt="Gamma Logo" className="h-8 w-auto object-contain" />
              </div>
              <div>
                 <h2 className="text-white font-bold leading-tight tracking-wide">Gamma</h2>
-                <p className="text-xs text-slate-500 tracking-widest uppercase">Admin Panel</p>
+                <p className="text-xs text-emerald-400 tracking-widest uppercase font-semibold">Admin Panel</p>
              </div>
           </div>
        </div>
@@ -33,19 +34,19 @@ export default function Sidebar({ activeView, setActiveView }) {
        {/* Navigation */}
        <nav className="flex-1 px-4 space-y-2">
          <SidebarItem 
-           icon="??" 
+           icon={<LayoutDashboard size={20} />} 
            label="Dashboard" 
            isActive={activeView === 'dashboard'} 
            onClick={() => setActiveView('dashboard')} 
          />
          <SidebarItem 
-           icon="??" 
+           icon={<Database size={20} />} 
            label="RAG Brain" 
            isActive={activeView === 'rag'} 
            onClick={() => setActiveView('rag')} 
          />
          <SidebarItem 
-           icon="??" 
+           icon={<Wrench size={20} />} 
            label="Integraciones (Tools)" 
            isActive={activeView === 'tools'} 
            onClick={() => setActiveView('tools')} 

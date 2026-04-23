@@ -90,3 +90,37 @@ async def approve_delete(
     
     await db.commit()
     return {"status": "success", "message": f"Documento {req.doc_id} purgado de forma segura bajo auditoría de {req.approved_by}"}
+
+@router.get("/nodes")
+async def get_nodes(
+    db: AsyncSession = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """ Retorna los documentos indexados para el panel de administración """
+    if not current_user.get("is_internal"):
+        raise HTTPException(status_code=403, detail="Privilegios insuficientes")
+        
+    from sqlalchemy import select
+    from app.db.models import DocumentNode
+    
+    # DISTINCT ON (doc_id) to get only unique docs
+    stmt = select(DocumentNode).order_by(DocumentNode.id.desc()).limit(50)
+    result = await db.execute(stmt)
+    nodes = result.scalars().all()
+    
+    # Filter uniques manually since sqlite/basic postgres driver might not like distinct on easily
+    seen = set()
+    unique_nodes = []
+    for n in nodes:
+        if n.doc_id not in seen:
+            seen.add(n.doc_id)
+            unique_nodes.append({
+                "id": n.doc_id,
+                "title": n.title,
+                "hash": n.doc_hash[:8] + "...",
+                "version": n.version,
+                "status": "SYNCED" if n.active else "OBSOLETE",
+                "tags": n.tags if n.tags else ["general"]
+            })
+            
+    return {"documents": unique_nodes}

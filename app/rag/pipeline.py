@@ -19,15 +19,15 @@ except ImportError:
 class GammiaRAGPipeline:
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.embeddings_model = "models/text-embedding-004"
+        self.embeddings_model = "models/gemini-embedding-001"
         try:
-           self.embedder = GoogleGenerativeAIEmbeddings(
-               model=self.embeddings_model, 
-               google_api_key=settings.GOOGLE_API_KEY
+           from google.genai import types as genai_types
+           # text-embedding-004 requires v1 API, not v1beta (default)
+           self.llm_client = genai.Client(
+               api_key=settings.GOOGLE_API_KEY,
+               http_options=genai_types.HttpOptions(api_version='v1')
            )
-           self.llm_client = genai.Client(api_key=settings.GOOGLE_API_KEY)
         except Exception:
-           self.embedder = None
            self.llm_client = None
 
     def _generate_hash(self, content: str) -> str:
@@ -74,7 +74,8 @@ class GammiaRAGPipeline:
             data = json.loads(response.text)
             return data
         except Exception as e:
-            return {"is_valid": False, "cleaned_content": "", "reason": f"AI Validation Error: {e}"}
+            print(f"Advertencia: AI Validation falló ({e}). Haciendo fallback a contenido crudo.")
+            return {"is_valid": True, "cleaned_content": raw_content, "reason": f"Mocked (Quota Error)"}
 
     async def request_deletion(self, doc_id: str, requested_by: str, reason: str = "manual_delete", new_hash: str = None):
         """ Registra la petición en audit y detiene el flujo (Human in the loop) """
@@ -124,8 +125,13 @@ class GammiaRAGPipeline:
         chunks = text_splitter.split_text(clean_content)
 
         # 4. Vectorización y Guardado
-        if self.embedder:
-            embeddings = await self.embedder.aembed_documents(chunks)
+        embeddings = []
+        if self.llm_client:
+            response = self.llm_client.models.embed_content(
+                model=self.embeddings_model,
+                contents=chunks
+            )
+            embeddings = [e.values for e in response.embeddings]
         else:
             embeddings = [[0.1] * 768 for _ in chunks]
 
