@@ -1,0 +1,23 @@
+# Python environments
+venv/
+env/
+.env
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE tools
+.vscode/
+.idea/
+
+# Local databases and logs
+*.sqlite3
+*.log
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.tfstate.lock.info
