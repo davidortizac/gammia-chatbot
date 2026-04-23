@@ -1,0 +1,69 @@
+import React, { useState } from 'react';
+
+const ToolCard = ({ icon, name, description, activeByDefault }) => {
+  const [active, setActive] = useState(activeByDefault);
+  
+  return (
+    <div className={`border rounded-2xl p-6 transition-all duration-300 ${active ? 'bg-emerald-900/10 border-emerald-500/30 shadow-[inset_0_0_20px_rgba(16,185,129,0.05)]' : 'bg-slate-900/50 border-slate-800/80 saturate-0 opacity-70'}`}>
+       <div className="flex justify-between items-start mb-4">
+          <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-2xl shadow-inner border border-slate-700">
+             {icon}
+          </div>
+          {/* Custom Toggle Switch */}
+          <button 
+             onClick={() => setActive(!active)}
+             className={`w-12 h-6 rounded-full relative transition-colors duration-300 focus:outline-none ${active ? 'bg-emerald-500' : 'bg-slate-700'}`}
+          >
+             <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform duration-300 shadow-md ${active ? 'translate-x-7' : 'translate-x-1'}`}></div>
+          </button>
+       </div>
+       <h3 className={`text-lg font-semibold tracking-tight ${active ? 'text-white' : 'text-slate-400'}`}>{name}</h3>
+       <p className="text-sm text-slate-500 mt-2 leading-relaxed">{description}</p>
+       
+       <div className="mt-6 pt-4 border-t border-slate-800/50 flex items-center justify-between">
+         <span className="text-xs font-mono text-slate-600">v1.2.0</span>
+         <span className={`text-xs font-semibold px-2 py-0.5 rounded ${active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+            {active ? 'RUNNING' : 'DISABLED'}
+         </span>
+       </div>
+    </div>
+  );
+};
+
+export default function ToolsView() {
+  return (
+    <div className="max-w-7xl mx-auto animate-fade-in">
+      <div className="mb-8">
+         <h2 className="text-2xl font-bold text-white tracking-tight">Integraciones de IA (Function Calling)</h2>
+         <p className="text-slate-400 text-sm mt-1">Habilita o deshabilita los super-poderes del agente GammIA globalmente.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+         <ToolCard 
+           icon="??"
+           name="Búsqueda Neural RAG"
+           description="Habilita al agente para rastrear en pgvector y LangChain para encontrar contexto interno ante pregunas técnicas."
+           activeByDefault={true}
+         />
+         <ToolCard 
+           icon="??"
+           name="Google Workspace Action"
+           description="Inyecta la capacidad de leer calendarios, agendar citas o disparar correos desde la cuenta central ciso@gamma."
+           activeByDefault={false}
+         />
+         <ToolCard 
+           icon="??"
+           name="Salesforce CRM Link"
+           description="Permite que GammIA consulte estatus de tickets o perfiles de clientes externos en tiempo real usando query params."
+           activeByDefault={true}
+         />
+         <ToolCard 
+           icon="??"
+           name="Scanner Vulnerabilidades (WIP)"
+           description="[En Desarrollo] Interfaz para disparar análisis pasivos en infraestructura indicada y devolver el reporte JSON al agente."
+           activeByDefault={false}
+         />
+      </div>
+    </div>
+  );
+}

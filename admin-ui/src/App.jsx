@@ -1,122 +1,41 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState } from 'react';
+import Sidebar from './components/Sidebar';
+import DashboardView from './views/DashboardView';
+import RagView from './views/RagView';
+import ToolsView from './views/ToolsView';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [activeView, setActiveView] = useState('dashboard');
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="flex h-screen bg-[#0B1120] text-slate-300 font-sans selection:bg-emerald-500/30">
+      
+      {/* Navigation Sidebar */}
+      <Sidebar activeView={activeView} setActiveView={setActiveView} />
 
-      <div className="ticks"></div>
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Top Gradient Blur Effect for Premium Feel */}
+        <div className="absolute top-0 w-full h-40 bg-emerald-500/5 blur-[120px] pointer-events-none"></div>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+        {/* Top Header */}
+        <header className="h-16 border-b border-slate-800/60 bg-slate-900/50 backdrop-blur-md flex items-center px-8 z-10 justify-between">
+          <h1 className="text-xl font-medium tracking-tight text-white drop-shadow-sm">GammIA <span className="text-emerald-400 font-light ml-1">Centro de Comando</span></h1>
+          <div className="flex items-center gap-3">
+             <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)] animate-pulse"></div>
+             <span className="text-xs uppercase tracking-wider font-semibold text-emerald-500">API Online</span>
+          </div>
+        </header>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+        {/* Dynamic Views */}
+        <div className="flex-1 overflow-y-auto p-8 z-10 custom-scrollbar">
+          {activeView === 'dashboard' && <DashboardView />}
+          {activeView === 'rag' && <RagView />}
+          {activeView === 'tools' && <ToolsView />}
+        </div>
+      </main>
+    </div>
+  );
 }
 
-export default App
+export default App;
