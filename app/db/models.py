@@ -47,3 +47,21 @@ class DocumentNode(Base):
     
     active = Column(Integer, default=1)     # 1 = activo, 0 = obsoleto
     last_updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class DocumentDeletionRequest(Base):
+    """
+    Tabla de auditoría para aprobaciones Human-in-the-Loop.
+    Registra quién intentó borrar o sobreescribir un documento en el RAG.
+    """
+    __tablename__ = "document_deletion_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    doc_id = Column(String, index=True)
+    requested_by = Column(String)      # Usuario/Sistema que pidió borrar
+    reason = Column(String)            # "manual_delete" o "version_update"
+    new_hash_to_upsert = Column(String, nullable=True) # Si es un update, guardamos el hash a esperar
+    
+    status = Column(String, default="PENDING") # "PENDING", "APPROVED", "REJECTED"
+    approved_by = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    approved_at = Column(DateTime(timezone=True), nullable=True)
