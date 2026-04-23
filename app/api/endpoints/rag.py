@@ -1,126 +1,399 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Dict, Any, List
+"""
+app/api/endpoints/rag.py
+------------------------
+Endpoints para gestión del RAG vectorial:
+- Upload de archivos reales (PDF, DOCX, XLSX, PPTX, web URL)
+- Sincronización de carpeta de Google Drive (Service Account)
+- CRUD de Tags personalizados
+- Listado de nodos vectorizados
+"""
+import json
+import re
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete
 
 from app.db.database import get_db
-from app.core.security import get_current_user
+from app.db.models import DocumentNode, Tag
+from app.rag.pipeline import GammiaRAGPipeline
+from app.rag.extractors import extract_text_from_file, SUPPORTED_EXTENSIONS, extract_from_url
+from app.core.config import settings
 
 router = APIRouter()
 
-class SyncRequest(BaseModel):
+# ─────────────────────────────────────────────────────────────────────────────
+# Tags CRUD
+# ─────────────────────────────────────────────────────────────────────────────
+
+SYSTEM_TAGS = [
+    {"id": "public",          "label": "Public",         "color": "sky"},
+    {"id": "internal",        "label": "Internal",       "color": "violet"},
+    {"id": "portfolio",       "label": "Portfolio",      "color": "amber"},
+    {"id": "solutions",       "label": "Solutions",      "color": "emerald"},
+    {"id": "policies",        "label": "Policies",       "color": "rose"},
+    {"id": "Project_manager", "label": "Project Manager","color": "orange"},
+    {"id": "cx",              "label": "CX",             "color": "teal"},
+    {"id": "cux",             "label": "CUX",            "color": "indigo"},
+    {"id": "marketing",       "label": "Marketing",      "color": "pink"},
+    {"id": "csoc",            "label": "CSOC",           "color": "red"},
+    {"id": "services",        "label": "Services",       "color": "lime"},
+    {"id": "general",         "label": "General",        "color": "slate"},
+]
+
+class TagCreate(BaseModel):
+    id: str
+    label: str
+    color: str = "slate"
+
+@router.get("/tags")
+async def list_tags(db: AsyncSession = Depends(get_db)):
+    """Lista todos los tags: los del sistema + los personalizados de la BD."""
+    result = await db.execute(select(Tag))
+    custom_tags = result.scalars().all()
+    custom_ids = {t.id for t in custom_tags}
+    # Combinar: system first, then custom (que no estén ya en system)
+    all_tags = list(SYSTEM_TAGS)
+    for t in custom_tags:
+        if t.id not in {st["id"] for st in SYSTEM_TAGS}:
+            all_tags.append({"id": t.id, "label": t.label, "color": t.color, "is_system": False})
+    return {"tags": all_tags}
+
+@router.post("/tags", status_code=201)
+async def create_tag(body: TagCreate, db: AsyncSession = Depends(get_db)):
+    """Crea un tag personalizado. Falla si ya existe."""
+    tag_id = re.sub(r'[^a-z0-9_]', '_', body.id.lower())
+    existing = await db.execute(select(Tag).where(Tag.id == tag_id))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail=f"El tag '{tag_id}' ya existe.")
+    # Verificar que tampoco sea un tag del sistema
+    system_ids = {t["id"] for t in SYSTEM_TAGS}
+    if tag_id in system_ids:
+        raise HTTPException(status_code=409, detail="Este tag ya existe como tag del sistema.")
+    new_tag = Tag(id=tag_id, label=body.label, color=body.color, is_system=False)
+    db.add(new_tag)
+    await db.commit()
+    return {"status": "created", "tag": {"id": tag_id, "label": body.label, "color": body.color}}
+
+@router.delete("/tags/{tag_id}")
+async def delete_tag(tag_id: str, db: AsyncSession = Depends(get_db)):
+    """Elimina un tag personalizado. Los tags del sistema son intocables."""
+    system_ids = {t["id"] for t in SYSTEM_TAGS}
+    if tag_id in system_ids:
+        raise HTTPException(status_code=403, detail="Los tags del sistema no se pueden eliminar.")
+    await db.execute(delete(Tag).where(Tag.id == tag_id))
+    await db.commit()
+    return {"status": "deleted", "tag_id": tag_id}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AI Tag Suggester
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def _suggest_tags_with_ai(text_sample: str, available_tag_ids: list) -> list:
+    """
+    Usa Gemini para sugerir qué tags son apropiados para el documento.
+    Retorna lista de IDs de tags sugeridos. El humano los aprueba en el frontend.
+    """
+    try:
+        from google import genai
+        from google.genai import types
+        client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+        tag_list = ", ".join(available_tag_ids)
+        prompt = f"""Analiza el siguiente fragmento de documento corporativo y sugiere cuáles de estos tags de clasificación son más apropiados:
+Tags disponibles: {tag_list}
+
+Fragmento del documento (primeros 2000 caracteres):
+{text_sample[:2000]}
+
+Responde ÚNICAMENTE con un JSON válido: {{"suggested_tags": ["tag1", "tag2"], "reasoning": "breve explicación"}}
+Solo incluye tags de la lista disponible."""
+        response = client.models.generate_content(
+            model=settings.MODEL_ID,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.1,
+                response_mime_type="application/json"
+            )
+        )
+        data = json.loads(response.text)
+        return data.get("suggested_tags", [])
+    except Exception as e:
+        print(f"AI tag suggestion failed: {e}")
+        return ["internal"]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Upload de Archivo Real
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/upload-file")
+async def upload_file(
+    file: UploadFile = File(...),
+    tags: str = Form("[]"),           # JSON array como string: '["internal","csoc"]'
+    requested_by: str = Form("admin"),
+    doc_id: Optional[str] = Form(None),
+    suggest_tags: bool = Form(False), # Si True, la IA sugiere tags antes de guardar
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Recibe un archivo real (PDF, DOCX, XLSX, PPTX, TXT, MD),
+    extrae el texto, opcionalmente sugiere tags con IA, y vectoriza.
+    """
+    filename = file.filename or "unknown"
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    supported = list(SUPPORTED_EXTENSIONS.keys())
+    if ext not in supported:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Tipo de archivo no soportado: .{ext}. Soportados: {', '.join(supported)}"
+        )
+
+    file_bytes = await file.read()
+    if len(file_bytes) > 50 * 1024 * 1024:  # 50 MB limit
+        raise HTTPException(status_code=413, detail="Archivo demasiado grande (máximo 50 MB).")
+
+    # Extraer texto
+    text = extract_text_from_file(file_bytes, filename)
+    if not text:
+        raise HTTPException(status_code=422, detail="No se pudo extraer texto del archivo.")
+
+    # Parsear tags enviados
+    try:
+        tag_list = json.loads(tags) if tags else []
+    except Exception:
+        tag_list = ["internal"]
+
+    # Sugerir tags con IA si se solicita (modo sugerencia, no guarda aún)
+    if suggest_tags:
+        result_tags = await db.execute(select(Tag))
+        db_tags = [t.id for t in result_tags.scalars().all()]
+        all_tag_ids = list({t["id"] for t in SYSTEM_TAGS} | set(db_tags))
+        suggested = await _suggest_tags_with_ai(text, all_tag_ids)
+        return {
+            "status": "suggestion",
+            "suggested_tags": suggested,
+            "filename": filename,
+            "text_preview": text[:500],
+            "char_count": len(text),
+            "message": "Revisa y aprueba los tags sugeridos, luego vuelve a llamar con los tags confirmados."
+        }
+
+    # Si no se piden sugerencias, ingestar directamente
+    final_doc_id = doc_id or f"upload_{filename.replace(' ', '_').lower()}_{hash(file_bytes) & 0xFFFF:04x}"
+    pipeline = GammiaRAGPipeline(db)
+    result = await pipeline.ingest_drive_document(
+        doc_id=final_doc_id,
+        title=filename,
+        full_content=text,
+        requested_by=requested_by,
+        tags=tag_list if tag_list else ["internal"]
+    )
+    return {**result, "filename": filename, "char_count": len(text)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# URL (Web Page) Upload
+# ─────────────────────────────────────────────────────────────────────────────
+
+class UrlIngestRequest(BaseModel):
+    url: str
+    tags: List[str] = ["public"]
+    requested_by: str = "admin"
+    suggest_tags: bool = False
+
+@router.post("/upload-url")
+async def upload_url(body: UrlIngestRequest, db: AsyncSession = Depends(get_db)):
+    """Extrae texto de una URL y lo vectoriza con los tags indicados."""
+    try:
+        text = extract_from_url(body.url)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Error al scrapear la URL: {e}")
+
+    if body.suggest_tags:
+        result_tags = await db.execute(select(Tag))
+        db_tags = [t.id for t in result_tags.scalars().all()]
+        all_tag_ids = list({t["id"] for t in SYSTEM_TAGS} | set(db_tags))
+        suggested = await _suggest_tags_with_ai(text, all_tag_ids)
+        return {
+            "status": "suggestion",
+            "suggested_tags": suggested,
+            "url": body.url,
+            "text_preview": text[:500],
+            "char_count": len(text)
+        }
+
+    doc_id = f"web_{re.sub(r'[^a-z0-9]', '_', body.url.lower())[:60]}"
+    pipeline = GammiaRAGPipeline(db)
+    result = await pipeline.ingest_drive_document(
+        doc_id=doc_id,
+        title=body.url,
+        full_content=text,
+        requested_by=body.requested_by,
+        tags=body.tags
+    )
+    return {**result, "url": body.url, "char_count": len(text)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Google Drive Folder Sync (Service Account)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class DriveSyncRequest(BaseModel):
+    folder_id: str
+    tags: List[str] = ["internal"]
+    requested_by: str = "admin"
+
+@router.post("/sync-drive-folder")
+async def sync_drive_folder(body: DriveSyncRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Sincroniza todos los archivos soportados de una carpeta de Google Drive.
+    Usa Service Account — la carpeta debe compartirse con la cuenta de servicio.
+    Deduplica automáticamente por hash MD5.
+    """
+    try:
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+        from googleapiclient.http import MediaIoBaseDownload
+        import io as _io
+
+        # Cargar credenciales del Service Account
+        sa_file = settings.GOOGLE_SERVICE_ACCOUNT_FILE
+        creds = service_account.Credentials.from_service_account_file(
+            sa_file, scopes=["https://www.googleapis.com/auth/drive.readonly"]
+        )
+        drive_service = build("drive", "v3", credentials=creds)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al conectar con Google Drive: {e}")
+
+    # Listar archivos en la carpeta
+    supported_mimes = {
+        "application/pdf": "pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+        "text/plain": "txt",
+        "text/markdown": "md",
+    }
+    
+    query = f"'{body.folder_id}' in parents and trashed=false"
+    files_resp = drive_service.files().list(
+        q=query,
+        fields="files(id, name, mimeType, md5Checksum, modifiedTime)",
+        pageSize=100
+    ).execute()
+    files = files_resp.get("files", [])
+
+    results = []
+    pipeline = GammiaRAGPipeline(db)
+
+    for f in files:
+        mime = f.get("mimeType", "")
+        ext = supported_mimes.get(mime)
+        fname = f.get("name", "unknown")
+        fid = f["id"]
+
+        if not ext:
+            results.append({"file": fname, "status": "skipped", "reason": "Tipo no soportado"})
+            continue
+
+        # Descargar archivo
+        try:
+            request = drive_service.files().get_media(fileId=fid)
+            buf = _io.BytesIO()
+            downloader = MediaIoBaseDownload(buf, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+            file_bytes = buf.getvalue()
+        except Exception as e:
+            results.append({"file": fname, "status": "error", "reason": str(e)})
+            continue
+
+        # Extraer texto
+        text = extract_text_from_file(file_bytes, fname)
+        if not text:
+            results.append({"file": fname, "status": "skipped", "reason": "Sin texto extraíble"})
+            continue
+
+        # Ingestar con deduplicación por hash (pipeline lo maneja)
+        result = await pipeline.ingest_drive_document(
+            doc_id=f"drive_{fid}",
+            title=fname,
+            full_content=text,
+            requested_by=body.requested_by,
+            tags=body.tags
+        )
+        results.append({"file": fname, "drive_id": fid, **result})
+
+    synced = sum(1 for r in results if r.get("status") == "success")
+    skipped = sum(1 for r in results if r.get("status") in ("skipped", "skipped"))
+    return {
+        "folder_id": body.folder_id,
+        "total_files": len(files),
+        "synced": synced,
+        "skipped": skipped,
+        "results": results
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Listado de Nodos RAG
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/nodes")
+async def list_nodes(db: AsyncSession = Depends(get_db)):
+    """Lista los documentos únicos vectorizados (agrupados por doc_id)."""
+    stmt = select(
+        DocumentNode.doc_id,
+        DocumentNode.title,
+        DocumentNode.version,
+        DocumentNode.doc_hash,
+        DocumentNode.source_type,
+        DocumentNode.tags,
+        DocumentNode.active,
+        DocumentNode.last_updated_at
+    ).where(DocumentNode.active == 1).order_by(DocumentNode.last_updated_at.desc())
+    result = await db.execute(stmt)
+    rows = result.fetchall()
+
+    # Deduplicar por doc_id (mostrar solo el más reciente de cada doc)
+    seen = {}
+    for row in rows:
+        if row.doc_id not in seen:
+            seen[row.doc_id] = {
+                "id": row.doc_id,
+                "title": row.title,
+                "version": row.version,
+                "hash": row.doc_hash[:8] if row.doc_hash else "—",
+                "source": row.source_type,
+                "tags": row.tags or [],
+                "status": "SYNCED",
+                "updated_at": row.last_updated_at.isoformat() if row.last_updated_at else None,
+            }
+    return {"documents": list(seen.values()), "total": len(seen)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Legacy: sync-intranet (mantener compatibilidad)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class IntranetSyncRequest(BaseModel):
     doc_id: str
     title: str
     content: str
-    tags: List[str] = ["general"]
-
-@router.post("/sync-web")
-async def sync_web(
-    db: AsyncSession = Depends(get_db),
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """
-    Endpoint para indexar el contenido de www.gammaingenieros.com hacia la base vectorial (pgvector)
-    """
-    # 1. Scrapear web
-    # 2. Partir docs (chunking)
-    # 3. Generar embeddings (Vertex AI text-embedding-004)
-    # 4. Guardar en tabla DocumentNode
-    return {"status": "success", "message": "Indexación web iniciada", "source": "web"}
-
+    tags: List[str] = ["internal"]
+    requested_by: str = "admin"
 
 @router.post("/sync-intranet")
-async def sync_intranet(
-    request: SyncRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """ Ingresa un nuevo documento al flujo (Sometido a Validación de IA) con Tags """
-    if not current_user.get("is_internal"):
-        raise HTTPException(status_code=403, detail="Privilegios insuficientes")
-        
-    from app.rag.pipeline import GammiaRAGPipeline
+async def sync_intranet(body: IntranetSyncRequest, db: AsyncSession = Depends(get_db)):
     pipeline = GammiaRAGPipeline(db)
-    
-    # Se pasa el email del usuario como solicitante
-    requested_by = current_user.get("email", "anonymous")
     result = await pipeline.ingest_drive_document(
-        doc_id=request.doc_id, 
-        title=request.title, 
-        full_content=request.content, 
-        requested_by=requested_by,
-        tags=request.tags
+        doc_id=body.doc_id,
+        title=body.title,
+        full_content=body.content,
+        requested_by=body.requested_by,
+        tags=body.tags
     )
     return result
-
-@router.post("/approve-delete")
-async def approve_delete(
-    request_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """ Aval documentado del responsable para purgar vectores o aprobar un update """
-    if not current_user.get("is_internal"):
-        raise HTTPException(status_code=403, detail="Privilegios insuficientes")
-
-    from sqlalchemy import select
-    from app.db.models import DocumentDeletionRequest
-    from app.rag.pipeline import GammiaRAGPipeline
-    import datetime
-
-    # 1. Recuperar el ticket
-    stmt = select(DocumentDeletionRequest).where(DocumentDeletionRequest.id == request_id)
-    result = await db.execute(stmt)
-    req = result.scalar_one_or_none()
-
-    if not req or req.status != "PENDING":
-        return {"status": "error", "message": "Solicitud inválida o ya procesada"}
-
-    # 2. Dejar huella del aval
-    req.status = "APPROVED"
-    req.approved_by = current_user.get("email", "admin")
-    from sqlalchemy.sql import func
-    req.approved_at = func.now()
-    
-    # 3. Ejecutar el purgado de memoria
-    pipeline = GammiaRAGPipeline(db)
-    await pipeline.execute_approved_deletion(req.doc_id)
-    
-    # 4. Si era por versión nueva, aquí se re-encolaría el ingest (simplificado para Phase 5)
-    
-    await db.commit()
-    return {"status": "success", "message": f"Documento {req.doc_id} purgado de forma segura bajo auditoría de {req.approved_by}"}
-
-@router.get("/nodes")
-async def get_nodes(
-    db: AsyncSession = Depends(get_db),
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """ Retorna los documentos indexados para el panel de administración """
-    if not current_user.get("is_internal"):
-        raise HTTPException(status_code=403, detail="Privilegios insuficientes")
-        
-    from sqlalchemy import select
-    from app.db.models import DocumentNode
-    
-    # DISTINCT ON (doc_id) to get only unique docs
-    stmt = select(DocumentNode).order_by(DocumentNode.id.desc()).limit(50)
-    result = await db.execute(stmt)
-    nodes = result.scalars().all()
-    
-    # Filter uniques manually since sqlite/basic postgres driver might not like distinct on easily
-    seen = set()
-    unique_nodes = []
-    for n in nodes:
-        if n.doc_id not in seen:
-            seen.add(n.doc_id)
-            unique_nodes.append({
-                "id": n.doc_id,
-                "title": n.title,
-                "hash": n.doc_hash[:8] + "...",
-                "version": n.version,
-                "status": "SYNCED" if n.active else "OBSOLETE",
-                "tags": n.tags if n.tags else ["general"]
-            })
-            
-    return {"documents": unique_nodes}

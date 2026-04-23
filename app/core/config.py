@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     
     # LLM Identity
     GOOGLE_API_KEY: str = ""
+    # Google Service Account (para Drive sync)
+    GOOGLE_SERVICE_ACCOUNT_FILE: str = "/app/service_account.json"
     # Google Workspace OAuth
     GOOGLE_CLIENT_ID: Optional[str] = None
     

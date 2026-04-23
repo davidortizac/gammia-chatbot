@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, Text, DateTime
+from sqlalchemy import Column, Integer, String, Float, Text, DateTime, Boolean
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.sql import func
 from app.db.database import Base
 try:
@@ -42,12 +43,11 @@ class DocumentNode(Base):
     source_type = Column(String, index=True) # "intranet_drive", "web"
     
     # ARRAY of strings for Metadata/RBAC tagging
-    from sqlalchemy.dialects.postgresql import ARRAY
     tags = Column(ARRAY(String), default=["general"]) 
 
     content = Column(Text)                  # El chunk de texto
-    # Por defecto text-embedding-004 de Google produce 768 dimensiones.
-    embedding = Column(Vector(768)) 
+    # gemini-embedding-001 produce 3072 dimensiones
+    embedding = Column(Vector(3072)) 
     
     active = Column(Integer, default=1)     # 1 = activo, 0 = obsoleto
     last_updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -69,3 +69,18 @@ class DocumentDeletionRequest(Base):
     approved_by = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     approved_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class Tag(Base):
+    """
+    Tags del sistema para clasificación RBAC de documentos.
+    Los tags del sistema (is_system=True) no se pueden eliminar.
+    Los tags personalizados se crean desde el panel de admin.
+    """
+    __tablename__ = "tags"
+
+    id = Column(String, primary_key=True)     # ej: "csoc", "marketing"
+    label = Column(String, nullable=False)    # ej: "CSOC", "Marketing"
+    color = Column(String, default="slate")   # ej: "emerald", "red"
+    is_system = Column(Boolean, default=False) # True = no se puede eliminar
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

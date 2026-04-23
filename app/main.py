@@ -8,21 +8,26 @@ from app.api.endpoints import chat, rag, analytics
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Crear tablas (En producción usar alembic para migraciones)
     async with engine.begin() as conn:
         from sqlalchemy import text
-        # Crea la extensión vectorial de supabase/postgres en init si no existe
         await conn.execute(text('CREATE EXTENSION IF NOT EXISTS vector'))
-        
-        # Patch temporal para añadir columna tags a BD viva sin alembic
+
+        # Patch 1: añadir columna tags si no existe
         try:
             await conn.execute(text("ALTER TABLE document_nodes ADD COLUMN IF NOT EXISTS tags VARCHAR[] DEFAULT ARRAY['general']::VARCHAR[]"))
         except Exception:
             pass
 
+        # Patch 2: actualizar dimensión del embedding de 768 a 3072 (gemini-embedding-001)
+        try:
+            await conn.execute(text("ALTER TABLE document_nodes ALTER COLUMN embedding TYPE vector(3072)"))
+        except Exception:
+            pass  # Ya tiene las dimensiones correctas o la tabla no existe aún
+
+        # Crear todas las tablas (incluyendo la nueva tabla 'tags')
         await conn.run_sync(Base.metadata.create_all)
+
     yield
-    # Shutdown
     await engine.dispose()
 
 app = FastAPI(
