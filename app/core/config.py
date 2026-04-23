@@ -9,11 +9,13 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/gammiadb"
     
     # Model configuration
-    MODEL_ID: str = "gemini-2.0-flash-lite"
+    MODEL_ID: str = "gemini-2.5-flash"
     TEMPERATURE: float = 0.1
     TOP_P: float = 0.95
     TOP_K: int = 40
     
+    # LLM Identity
+    GOOGLE_API_KEY: str = ""
     # Google Workspace OAuth
     GOOGLE_CLIENT_ID: Optional[str] = None
     

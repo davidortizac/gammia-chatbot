@@ -22,10 +22,8 @@ async def chat(
 
     start_time = time.time()
     
-    # Aquí llamaremos a nuestro agente
-    # response, metadata = await execute_gammia_agent(query, current_user.get("is_internal", False))
-    response_text = "Esta es una respuesta simulada de GammIA."
-    metadata = {"tokens_in": 15, "tokens_out": 20, "source_used": "direct_llm"}
+    # Aquí llamamos a nuestro agente
+    response_text, metadata = await execute_gammia_agent(query, current_user.get("is_internal", False))
 
     latency = int((time.time() - start_time) * 1000)
 
