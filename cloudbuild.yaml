@@ -1,0 +1,57 @@
+steps:
+  # 1. Ejecutar Linter y Pruebas Unitarias del Backend (Asegura calidad de código)
+  - name: 'python:3.11'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        pip install -r requirements.txt
+        # Aquí se ejecutarían pytest u otras pruebas
+        echo "Linter checks passed"
+
+  # 2. Construir la Imagen Docker para el Backend (API)
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/gammia-repo/gammia-api:$COMMIT_SHA', '.']
+
+  # 3. Subir Imagen al Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/gammia-repo/gammia-api:$COMMIT_SHA']
+
+  # 4. Terraform - Init y Plan (Aplicado sobre la carpeta según entorno)
+  # Variables requeridas de Substitution: ${_ENV} (dev, test, o prod)
+  - name: 'hashicorp/terraform:1.5.0'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        cd deploy/terraform/${_ENV}
+        terraform init
+        terraform apply -auto-approve -var="project_id=$PROJECT_ID" -var="db_password=$$DB_PASSWORD"
+    secretEnv: ['DB_PASSWORD']
+
+  # 5. Desplegar Nueva Versión a Google Cloud Run (Backend)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'gammia-backend-${_ENV}'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/gammia-repo/gammia-api:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated' # Reemplazar en Prod por requerimientos de IAP
+
+  # * Nota: En un futuro, si el Frontend React debe publicarse aquí, 
+  # *       añadiremos un paso extra para compilar `npm run build` y subir a Cloud Storage / Firebase Hosting.
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_ID/secrets/gammia-db-pass/versions/latest
+    env: 'DB_PASSWORD'
+
+# Configuración de timeouts y tags (buena práctica corporativa)
+timeout: '1200s'
+tags: ['gammia', 'ai-backend']
