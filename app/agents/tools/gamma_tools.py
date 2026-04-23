@@ -2,10 +2,12 @@ from typing import Dict, Any
 
 def search_tool(query: str) -> str:
     """
-    Busca información en la web o en la Intranet de Gamma Ingenieros sobre ciberseguridad.
-    Usar esta herramienta cuando se te pregunten cosas recientes o datos de políticas internas que no sepas.
+    Busca información en la web o en la base de datos de Intranet (Google Drive Vectorizado) sobre Gamma Ingenieros.
+    Usar esta herramienta cuando necesites contexto directo sobre políticas, clientes, recursos o guías internas.
     """
-    return f"Resultados simulados para {query}: Gamma Ingenieros aplica políticas zero-trust."
+    # En producción este tool se conecta asincrónicamente a pgvector
+    # e.g., session.execute(select(DocumentNode)... order_by(DocumentNode.embedding.l2_distance(query_vector)))
+    return f"[BÚSQUEDA RAG (Simulada para {query})]\nLos documentos de la versión más reciente en Base de Datos muestran que Gamma aplica políticas zero-trust estrictas."
 
 def salesforce_connector(consulta_cliente: str) -> str:
     """

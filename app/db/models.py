@@ -30,13 +30,20 @@ class InteractionLog(Base):
 class DocumentNode(Base):
     """
     Modelo para la Base de Datos Vectorial (RAG).
-    Almacena los fragmentos indexados de intranet y web.
+    Almacena los fragmentos indexados listos para búsqueda por similitud.
     """
     __tablename__ = "document_nodes"
 
     id = Column(Integer, primary_key=True, index=True)
-    source_type = Column(String, index=True) # Ej: "intranet", "web"
-    url_or_path = Column(String)
-    content = Column(Text)
+    doc_id = Column(String, index=True)     # Ej: "1A2B3C_manual_seguridad" (Google Drive ID)
+    title = Column(String)
+    version = Column(Integer, default=1)
+    doc_hash = Column(String, index=True)   # Hash MD5 para detectar cambios
+    source_type = Column(String, index=True) # "intranet_drive", "web"
+    
+    content = Column(Text)                  # El chunk de texto
     # Por defecto text-embedding-004 de Google produce 768 dimensiones.
     embedding = Column(Vector(768)) 
+    
+    active = Column(Integer, default=1)     # 1 = activo, 0 = obsoleto
+    last_updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
