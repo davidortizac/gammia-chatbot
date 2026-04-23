@@ -21,13 +21,10 @@ class GammiaRAGPipeline:
         self.db = db
         self.embeddings_model = "models/gemini-embedding-001"
         try:
-           from google.genai import types as genai_types
-           # text-embedding-004 requires v1 API, not v1beta (default)
-           self.llm_client = genai.Client(
-               api_key=settings.GOOGLE_API_KEY,
-               http_options=genai_types.HttpOptions(api_version='v1')
-           )
-        except Exception:
+           # Use default API version (v1beta) - works with gemini-embedding-001
+           self.llm_client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+        except Exception as e:
+           print(f"Warning: GenAI client init failed: {e}")
            self.llm_client = None
 
     def _generate_hash(self, content: str) -> str:
@@ -127,13 +124,17 @@ class GammiaRAGPipeline:
         # 4. Vectorización y Guardado
         embeddings = []
         if self.llm_client:
-            response = self.llm_client.models.embed_content(
-                model=self.embeddings_model,
-                contents=chunks
-            )
-            embeddings = [e.values for e in response.embeddings]
+            try:
+                response = self.llm_client.models.embed_content(
+                    model=self.embeddings_model,
+                    contents=chunks
+                )
+                embeddings = [e.values for e in response.embeddings]
+            except Exception as emb_err:
+                print(f"Warning: Embedding falló ({emb_err}). Usando vectores mock para continuar.")
+                embeddings = [[0.0] * 3072 for _ in chunks]
         else:
-            embeddings = [[0.1] * 768 for _ in chunks]
+            embeddings = [[0.0] * 3072 for _ in chunks]
 
         new_nodes = []
         for i, chunk_text in enumerate(chunks):
