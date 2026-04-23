@@ -53,14 +53,8 @@ resource "google_sql_database_instance" "gammia_db_instance" {
   settings {
     tier = "db-f1-micro" # Para desarrollo. Subir en Prod.
     ip_configuration {
-      ipv4_enabled    = false # Completamente privada
+      ipv4_enabled    = false
       private_network = google_compute_network.gamma_vpc.id
-    }
-    
-    # Habilitar extension pgvector por defecto
-    database_flags {
-      name  = "cloudsql.enable_pgvector"
-      value = "on"
     }
   }
 }

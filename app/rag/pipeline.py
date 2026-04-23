@@ -88,9 +88,9 @@ class GammiaRAGPipeline:
         await self.db.commit()
         return {"status": "pending_approval", "request_id": req.id, "message": "La eliminación o sobreescritura requiere aprobación del responsable."}
 
-    async def ingest_drive_document(self, doc_id: str, title: str, full_content: str, requested_by: str):
+    async def ingest_drive_document(self, doc_id: str, title: str, full_content: str, requested_by: str, tags: List[str] = ["general"]):
         """
-        Ingesta con Validación de IA y Aprobación de Actualizaciones.
+        Ingesta con Validación de IA y Aprobación de Actualizaciones, sumando Etiquetado (Tags).
         """
         new_hash = self._generate_hash(full_content)
 
@@ -134,7 +134,8 @@ class GammiaRAGPipeline:
             node = DocumentNode(
                 doc_id=doc_id, title=title, version=version,
                 doc_hash=new_hash, source_type="intranet_drive",
-                content=chunk_text, embedding=embeddings[i], active=1
+                content=chunk_text, embedding=embeddings[i], active=1,
+                tags=tags
             )
             self.db.add(node)
             new_nodes.append(node)

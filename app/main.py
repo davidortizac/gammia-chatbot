@@ -10,8 +10,16 @@ from app.api.endpoints import chat, rag, analytics
 async def lifespan(app: FastAPI):
     # Startup: Crear tablas (En producción usar alembic para migraciones)
     async with engine.begin() as conn:
+        from sqlalchemy import text
         # Crea la extensión vectorial de supabase/postgres en init si no existe
-        # await conn.execute(text('CREATE EXTENSION IF NOT EXISTS vector'))
+        await conn.execute(text('CREATE EXTENSION IF NOT EXISTS vector'))
+        
+        # Patch temporal para añadir columna tags a BD viva sin alembic
+        try:
+            await conn.execute(text("ALTER TABLE document_nodes ADD COLUMN IF NOT EXISTS tags VARCHAR[] DEFAULT ARRAY['general']::VARCHAR[]"))
+        except Exception:
+            pass
+
         await conn.run_sync(Base.metadata.create_all)
     yield
     # Shutdown
@@ -21,6 +29,17 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     lifespan=lifespan
+)
+
+from fastapi.middleware.cors import CORSMiddleware
+
+# Configuración CORS para permitir peticiones del Frontend React (Local y Prod)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # En producción reemplazar con ["https://admin.gammaingenieros.com", "http://localhost:5173"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Register routes

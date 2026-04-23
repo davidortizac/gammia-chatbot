@@ -20,13 +20,20 @@ async def execute_gammia_agent(query: str, is_internal_user: bool):
     """
     
     # 1. Definir Tools según privilegios
+    def secure_search_tool(query: str) -> str:
+        """
+        Busca información en la web o en la base de datos de Intranet (Google Drive Vectorizado) sobre Gamma Ingenieros.
+        Usar esta herramienta cuando necesites contexto directo sobre políticas, clientes, recursos o guías internas.
+        """
+        return search_tool(query, is_internal=is_internal_user)
+
     active_tools = []
     if is_internal_user:
         # Intranet: Acceso completo a CRM, Búsqueda y Workspace
-        active_tools = [search_tool, salesforce_connector, workspace_integration]
+        active_tools = [secure_search_tool, salesforce_connector, workspace_integration]
     else:
         # Web Pública: Restringido a solo búsqueda (FAQ / RAG público)
-        active_tools = [search_tool]
+        active_tools = [secure_search_tool]
 
     # 2. Configurar el LLM
     config = types.GenerateContentConfig(

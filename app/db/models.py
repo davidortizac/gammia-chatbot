@@ -41,6 +41,10 @@ class DocumentNode(Base):
     doc_hash = Column(String, index=True)   # Hash MD5 para detectar cambios
     source_type = Column(String, index=True) # "intranet_drive", "web"
     
+    # ARRAY of strings for Metadata/RBAC tagging
+    from sqlalchemy.dialects.postgresql import ARRAY
+    tags = Column(ARRAY(String), default=["general"]) 
+
     content = Column(Text)                  # El chunk de texto
     # Por defecto text-embedding-004 de Google produce 768 dimensiones.
     embedding = Column(Vector(768)) 

@@ -1,11 +1,18 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Dict, Any
+from typing import Dict, Any, List
+from pydantic import BaseModel
 
 from app.db.database import get_db
 from app.core.security import get_current_user
 
 router = APIRouter()
+
+class SyncRequest(BaseModel):
+    doc_id: str
+    title: str
+    content: str
+    tags: List[str] = ["general"]
 
 @router.post("/sync-web")
 async def sync_web(
@@ -24,22 +31,26 @@ async def sync_web(
 
 @router.post("/sync-intranet")
 async def sync_intranet(
-    doc_id: str,
-    title: str,
-    content: str, 
+    request: SyncRequest,
     db: AsyncSession = Depends(get_db),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
-    """ Ingresa un nuevo documento al flujo (Sometido a Validación de IA) """
+    """ Ingresa un nuevo documento al flujo (Sometido a Validación de IA) con Tags """
     if not current_user.get("is_internal"):
-        return {"status": "error", "message": "Privilegios insuficientes"}
+        raise HTTPException(status_code=403, detail="Privilegios insuficientes")
         
     from app.rag.pipeline import GammiaRAGPipeline
     pipeline = GammiaRAGPipeline(db)
     
     # Se pasa el email del usuario como solicitante
     requested_by = current_user.get("email", "anonymous")
-    result = await pipeline.ingest_drive_document(doc_id, title, content, requested_by)
+    result = await pipeline.ingest_drive_document(
+        doc_id=request.doc_id, 
+        title=request.title, 
+        full_content=request.content, 
+        requested_by=requested_by,
+        tags=request.tags
+    )
     return result
 
 @router.post("/approve-delete")
