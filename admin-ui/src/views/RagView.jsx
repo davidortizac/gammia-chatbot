@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Upload, Tag, CheckCircle, AlertCircle, Loader, RotateCcw, Globe, HardDrive, Plus, X, Sparkles } from 'lucide-react';
+import { FileText, Upload, Tag, CheckCircle, AlertCircle, Loader, RotateCcw, Globe, HardDrive, Plus, X, Sparkles, Trash2, Pencil, RefreshCw, Eye, ArchiveRestore } from 'lucide-react';
 import { API_CONFIG } from '../config';
 import { GlobalModal } from '../App';
 
@@ -56,12 +56,18 @@ export default function RagView() {
   const [message, setMessage]       = useState('');
   const [dragOver, setDragOver]     = useState(false);
   const [suggestedTags, setSuggestedTags] = useState(null);
-  const [pendingPayload, setPendingPayload] = useState(null); // { type: 'file'|'url', data }
+  const [pendingPayload, setPendingPayload] = useState(null);
   const [driveFolder, setDriveFolder] = useState('');
   const [driveResult, setDriveResult] = useState(null);
   const [showNewTag, setShowNewTag] = useState(false);
   const [newTag, setNewTag]         = useState({ id:'', label:'', color:'emerald' });
   const [urlInput, setUrlInput]     = useState('');
+
+  // Maintenance state
+  const [editDoc, setEditDoc]       = useState(null); // { id, title, tags } — modal editar tags
+  const [chunksDoc, setChunksDoc]   = useState(null); // { doc_id, chunks } — modal ver chunks
+  const [confirmDelete, setConfirmDelete] = useState(null); // { id, title } — modal confirmar borrado
+  const [maintStatus, setMaintStatus] = useState({}); // { [doc_id]: 'loading'|'ok'|'error' }
 
   const authHeaders = API_CONFIG.getHeaders();
   const base = API_CONFIG.BASE_URL;
@@ -79,6 +85,55 @@ export default function RagView() {
       const r = await fetch(`${base}/api/v1/rag/nodes`, { headers: authHeaders });
       if (r.ok) { const d = await r.json(); setDocuments(d.documents || []); }
     } catch {} finally { setLoadingDocs(false); }
+  };
+
+  // Maintenance actions
+  const softDelete = async (docId) => {
+    setMaintStatus(p => ({...p, [docId]: 'loading'}));
+    try {
+      const r = await fetch(`${base}/api/v1/rag/nodes/${docId}?force=false`, {
+        method: 'DELETE', headers: authHeaders
+      });
+      const d = await r.json();
+      setMaintStatus(p => ({...p, [docId]: r.ok ? 'ok' : 'error'}));
+      if (r.ok) { setConfirmDelete(null); fetchDocs(); }
+      else alert(d.detail || 'Error al desactivar');
+    } catch (e) { setMaintStatus(p => ({...p, [docId]: 'error'})); alert(e.message); }
+  };
+
+  const hardDelete = async (docId) => {
+    setMaintStatus(p => ({...p, [docId]: 'loading'}));
+    try {
+      const r = await fetch(`${base}/api/v1/rag/nodes/${docId}?force=true`, {
+        method: 'DELETE', headers: authHeaders
+      });
+      const d = await r.json();
+      setMaintStatus(p => ({...p, [docId]: r.ok ? 'ok' : 'error'}));
+      if (r.ok) { setConfirmDelete(null); fetchDocs(); }
+      else alert(d.detail || 'Error al eliminar');
+    } catch (e) { alert(e.message); }
+  };
+
+  const updateTags = async (docId, newTags) => {
+    setMaintStatus(p => ({...p, [docId]: 'loading'}));
+    try {
+      const r = await fetch(`${base}/api/v1/rag/nodes/${docId}/tags`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags: newTags })
+      });
+      const d = await r.json();
+      setMaintStatus(p => ({...p, [docId]: r.ok ? 'ok' : 'error'}));
+      if (r.ok) { setEditDoc(null); fetchDocs(); }
+      else alert(d.detail || 'Error');
+    } catch (e) { alert(e.message); }
+  };
+
+  const loadChunks = async (docId) => {
+    try {
+      const r = await fetch(`${base}/api/v1/rag/nodes/${docId}/chunks`, { headers: authHeaders });
+      if (r.ok) { const d = await r.json(); setChunksDoc(d); }
+    } catch (e) { alert(e.message); }
   };
 
   useEffect(() => { fetchTags(); fetchDocs(); }, []);
@@ -378,18 +433,18 @@ export default function RagView() {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-800/50 border-b border-slate-700">
-                {['Documento','Tags','Fuente','Estado'].map(h => (
+                {['Documento','Tags','Fuente','Estado','Acciones'].map(h => (
                   <th key={h} className="p-4 text-xs font-medium text-slate-400 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {loadingDocs ? (
-                <tr><td colSpan="4" className="p-8 text-center text-slate-500">
+                <tr><td colSpan="5" className="p-8 text-center text-slate-500">
                   <Loader size={18} className="animate-spin inline mr-2"/>Cargando...
                 </td></tr>
               ) : documents.length === 0 ? (
-                <tr><td colSpan="4" className="p-12 text-center text-slate-500 text-sm">
+                <tr><td colSpan="5" className="p-12 text-center text-slate-500 text-sm">
                   Sin documentos. Usa la pestaña "Subir" para comenzar.
                 </td></tr>
               ) : documents.map(doc => (
@@ -398,7 +453,7 @@ export default function RagView() {
                     <div className="flex items-center gap-3">
                       <FileText size={18} className="text-slate-500 shrink-0" strokeWidth={1.5}/>
                       <div>
-                        <p className="text-sm font-medium text-slate-200 truncate max-w-[200px]">{doc.title}</p>
+                        <p className="text-sm font-medium text-slate-200 truncate max-w-[180px]">{doc.title}</p>
                         <p className="text-xs text-slate-600 font-mono">{doc.hash} · v{doc.version}</p>
                       </div>
                     </div>
@@ -413,9 +468,32 @@ export default function RagView() {
                   </td>
                   <td className="p-4 text-xs text-slate-500 font-mono">{doc.source}</td>
                   <td className="p-4">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"/>
-                      <span className="text-xs text-emerald-400 font-medium">Activo</span>
+                    {maintStatus[doc.id] === 'loading' ? (
+                      <Loader size={14} className="animate-spin text-slate-400"/>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"/>
+                        <span className="text-xs text-emerald-400 font-medium">Activo</span>
+                      </div>
+                    )}
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-1">
+                      {/* Ver chunks */}
+                      <button onClick={() => loadChunks(doc.id)} title="Ver fragmentos"
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 transition-all">
+                        <Eye size={14}/>
+                      </button>
+                      {/* Editar tags */}
+                      <button onClick={() => setEditDoc({id: doc.id, title: doc.title, tags: [...(doc.tags||[])]})} title="Editar tags"
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-all">
+                        <Pencil size={14}/>
+                      </button>
+                      {/* Eliminar */}
+                      <button onClick={() => setConfirmDelete({id: doc.id, title: doc.title})} title="Eliminar"
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all">
+                        <Trash2 size={14}/>
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -431,33 +509,25 @@ export default function RagView() {
         </div>
       )}
 
-      {/* ── MODAL NUEVO TAG — via Portal en document.body ──────────────── */}
+      {/* ── MODAL NUEVO TAG ───────────────────────────────────────────────── */}
       <GlobalModal onClose={() => setShowNewTag(false)}>
         {showNewTag && (
           <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-white font-semibold">Crear nuevo tag</h3>
-              <button onClick={() => setShowNewTag(false)} className="text-slate-400 hover:text-white transition-colors">
-                <X size={18}/>
-              </button>
+              <button onClick={() => setShowNewTag(false)} className="text-slate-400 hover:text-white"><X size={18}/></button>
             </div>
             <div className="space-y-3">
+              <input value={newTag.id}
+                onChange={e => setNewTag({...newTag, id: e.target.value.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')})}
+                placeholder="ID interno (ej: legal, rrhh)"
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 font-mono"/>
+              <input value={newTag.label}
+                onChange={e => setNewTag({...newTag, label: e.target.value})}
+                placeholder="Etiqueta visual (ej: Legal)"
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"/>
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">ID interno (sin espacios)</label>
-                <input value={newTag.id}
-                  onChange={e => setNewTag({...newTag, id: e.target.value.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')})}
-                  placeholder="ej: legal, compliance, rrhh"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 font-mono"/>
-              </div>
-              <div>
-                <label className="text-xs text-slate-400 mb-1 block">Etiqueta visual</label>
-                <input value={newTag.label}
-                  onChange={e => setNewTag({...newTag, label: e.target.value})}
-                  placeholder="ej: Legal, Compliance, RRHH"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"/>
-              </div>
-              <div>
-                <label className="text-xs text-slate-400 mb-2 block">Color</label>
+                <p className="text-xs text-slate-400 mb-2">Color</p>
                 <div className="flex flex-wrap gap-2">
                   {COLOR_OPTIONS.map(c => (
                     <button key={c} type="button" onClick={() => setNewTag({...newTag, color: c})}
@@ -470,9 +540,90 @@ export default function RagView() {
                 </div>
               </div>
               <button onClick={createTag} disabled={!newTag.id || !newTag.label}
-                className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-900 font-semibold py-2.5 rounded-lg text-sm transition-all mt-2">
+                className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-900 font-semibold py-2.5 rounded-lg text-sm transition-all">
                 <Plus size={14}/> Crear tag
               </button>
+            </div>
+          </div>
+        )}
+      </GlobalModal>
+
+      {/* ── MODAL EDITAR TAGS ─────────────────────────────────────────────── */}
+      <GlobalModal onClose={() => setEditDoc(null)}>
+        {editDoc && (
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-white font-semibold">Editar tags</h3>
+                <p className="text-xs text-slate-500 truncate max-w-[280px]">{editDoc.title}</p>
+              </div>
+              <button onClick={() => setEditDoc(null)} className="text-slate-400 hover:text-white"><X size={18}/></button>
+            </div>
+            <p className="text-xs text-slate-500 mb-3">Selecciona los tags de acceso para este documento:</p>
+            <div className="flex flex-wrap gap-2 mb-5">
+              {tags.map(t => (
+                <TagChip key={t.id} tag={t} selected={editDoc.tags.includes(t.id)}
+                  onClick={id => setEditDoc(p => ({...p, tags: p.tags.includes(id) ? p.tags.filter(x=>x!==id) : [...p.tags,id]}))}/>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => updateTags(editDoc.id, editDoc.tags)} disabled={editDoc.tags.length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-900 font-semibold text-sm rounded-lg transition-all">
+                <CheckCircle size={13}/> Guardar tags
+              </button>
+              <button onClick={() => setEditDoc(null)} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">Cancelar</button>
+            </div>
+          </div>
+        )}
+      </GlobalModal>
+
+      {/* ── MODAL CONFIRMAR BORRADO ───────────────────────────────────────── */}
+      <GlobalModal onClose={() => setConfirmDelete(null)}>
+        {confirmDelete && (
+          <div className="bg-slate-900 border border-rose-500/30 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-white font-semibold">Eliminar documento</h3>
+              <button onClick={() => setConfirmDelete(null)} className="text-slate-400 hover:text-white"><X size={18}/></button>
+            </div>
+            <p className="text-sm text-slate-300 mb-1 truncate">{confirmDelete.title}</p>
+            <p className="text-xs text-slate-500 mb-5">Esta acción afecta todos los fragmentos vectorizados de este documento.</p>
+            <div className="space-y-3">
+              <button onClick={() => softDelete(confirmDelete.id)}
+                className="w-full flex items-center gap-2 px-4 py-3 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-xl text-sm font-medium transition-all">
+                <ArchiveRestore size={15}/> Desactivar (soft delete) — reversible
+              </button>
+              <button onClick={() => hardDelete(confirmDelete.id)}
+                className="w-full flex items-center gap-2 px-4 py-3 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 rounded-xl text-sm font-medium transition-all">
+                <Trash2 size={15}/> Eliminar permanentemente — irreversible
+              </button>
+            </div>
+          </div>
+        )}
+      </GlobalModal>
+
+      {/* ── MODAL VER CHUNKS ─────────────────────────────────────────────── */}
+      <GlobalModal onClose={() => setChunksDoc(null)}>
+        {chunksDoc && (
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-2xl shadow-2xl max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4 shrink-0">
+              <div>
+                <h3 className="text-white font-semibold">Fragmentos vectorizados</h3>
+                <p className="text-xs text-slate-500">{chunksDoc.total_chunks} chunks · ID: {chunksDoc.doc_id}</p>
+              </div>
+              <button onClick={() => setChunksDoc(null)} className="text-slate-400 hover:text-white"><X size={18}/></button>
+            </div>
+            <div className="overflow-y-auto space-y-3 flex-1 pr-1">
+              {chunksDoc.chunks?.map((c, i) => (
+                <div key={c.chunk_id} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-mono text-slate-500">Chunk #{i+1} · ID:{c.chunk_id} · v{c.version} · {c.content_length} chars</span>
+                    <div className="flex gap-1">
+                      {c.tags?.map(t => <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">#{t}</span>)}
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap">{c.content_preview}</p>
+                </div>
+              ))}
             </div>
           </div>
         )}

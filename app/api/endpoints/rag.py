@@ -397,3 +397,164 @@ async def sync_intranet(body: IntranetSyncRequest, db: AsyncSession = Depends(ge
         tags=body.tags
     )
     return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Mantenimiento de la Base Vectorial
+# ─────────────────────────────────────────────────────────────────────────────
+
+class UpdateTagsRequest(BaseModel):
+    tags: List[str]
+
+class RevectorizeRequest(BaseModel):
+    content: str
+    tags: Optional[List[str]] = None
+    requested_by: str = "admin"
+
+
+@router.get("/nodes/{doc_id}/chunks")
+async def get_doc_chunks(doc_id: str, db: AsyncSession = Depends(get_db)):
+    """Retorna todos los chunks vectorizados de un documento específico."""
+    stmt = select(
+        DocumentNode.id,
+        DocumentNode.title,
+        DocumentNode.version,
+        DocumentNode.content,
+        DocumentNode.tags,
+        DocumentNode.active,
+        DocumentNode.last_updated_at,
+    ).where(
+        DocumentNode.doc_id == doc_id,
+        DocumentNode.active == 1
+    ).order_by(DocumentNode.id)
+    result = await db.execute(stmt)
+    rows = result.fetchall()
+    return {
+        "doc_id": doc_id,
+        "total_chunks": len(rows),
+        "chunks": [
+            {
+                "chunk_id": r.id,
+                "version": r.version,
+                "content_preview": r.content[:200] + ("..." if len(r.content) > 200 else ""),
+                "content_length": len(r.content),
+                "tags": r.tags or [],
+                "updated_at": r.last_updated_at.isoformat() if r.last_updated_at else None,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.patch("/nodes/{doc_id}/tags")
+async def update_doc_tags(doc_id: str, body: UpdateTagsRequest, db: AsyncSession = Depends(get_db)):
+    """Actualiza los tags de TODOS los chunks de un documento sin re-vectorizar."""
+    from sqlalchemy import update as sa_update
+    stmt = (
+        sa_update(DocumentNode)
+        .where(DocumentNode.doc_id == doc_id, DocumentNode.active == 1)
+        .values(tags=body.tags)
+    )
+    result = await db.execute(stmt)
+    await db.commit()
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail=f"Documento '{doc_id}' no encontrado.")
+    return {
+        "status": "updated",
+        "doc_id": doc_id,
+        "new_tags": body.tags,
+        "chunks_updated": result.rowcount
+    }
+
+
+@router.post("/nodes/{doc_id}/revectorize")
+async def revectorize_document(
+    doc_id: str,
+    body: RevectorizeRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Re-vectoriza un documento existente con contenido nuevo.
+    Incrementa la versión automáticamente y marca los chunks anteriores como inactivos.
+    """
+    # Obtener metadata del documento anterior
+    stmt = select(DocumentNode.title, DocumentNode.tags, DocumentNode.version).where(
+        DocumentNode.doc_id == doc_id, DocumentNode.active == 1
+    ).limit(1)
+    row = (await db.execute(stmt)).first()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Documento '{doc_id}' no encontrado.")
+
+    pipeline = GammiaRAGPipeline(db)
+    result = await pipeline.ingest_drive_document(
+        doc_id=doc_id,
+        title=row.title,
+        full_content=body.content,
+        requested_by=body.requested_by,
+        tags=body.tags if body.tags is not None else row.tags or ["internal"]
+    )
+    return {**result, "doc_id": doc_id, "previous_version": row.version}
+
+
+@router.delete("/nodes/{doc_id}")
+async def delete_document(
+    doc_id: str,
+    force: bool = False,
+    requested_by: str = "admin",
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Elimina un documento de la base vectorial.
+    - force=False (default): marca como inactivo (soft delete, reversible).
+    - force=True: elimina físicamente todos los chunks (hard delete, irreversible).
+    """
+    from sqlalchemy import update as sa_update, delete as sa_delete
+
+    # Verificar que existe
+    check = await db.execute(
+        select(DocumentNode.id).where(DocumentNode.doc_id == doc_id, DocumentNode.active == 1).limit(1)
+    )
+    if not check.first():
+        raise HTTPException(status_code=404, detail=f"Documento '{doc_id}' no encontrado o ya eliminado.")
+
+    if force:
+        # Hard delete: elimina físicamente
+        result = await db.execute(sa_delete(DocumentNode).where(DocumentNode.doc_id == doc_id))
+        await db.commit()
+        return {
+            "status": "deleted",
+            "type": "hard_delete",
+            "doc_id": doc_id,
+            "chunks_removed": result.rowcount,
+            "message": "Documento eliminado permanentemente de la base vectorial."
+        }
+    else:
+        # Soft delete: marca como inactivo (recoverable)
+        result = await db.execute(
+            sa_update(DocumentNode)
+            .where(DocumentNode.doc_id == doc_id)
+            .values(active=0)
+        )
+        await db.commit()
+        return {
+            "status": "deactivated",
+            "type": "soft_delete",
+            "doc_id": doc_id,
+            "chunks_deactivated": result.rowcount,
+            "message": "Documento desactivado. Usa force=true para eliminación permanente."
+        }
+
+
+@router.post("/nodes/{doc_id}/restore")
+async def restore_document(doc_id: str, db: AsyncSession = Depends(get_db)):
+    """Restaura un documento que fue eliminado con soft delete."""
+    from sqlalchemy import update as sa_update
+    result = await db.execute(
+        sa_update(DocumentNode)
+        .where(DocumentNode.doc_id == doc_id, DocumentNode.active == 0)
+        .values(active=1)
+    )
+    await db.commit()
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Documento no encontrado o ya está activo.")
+    return {"status": "restored", "doc_id": doc_id, "chunks_restored": result.rowcount}
