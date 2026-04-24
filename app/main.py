@@ -27,6 +27,37 @@ async def lifespan(app: FastAPI):
         # Crear todas las tablas (incluyendo la nueva tabla 'tags')
         await conn.run_sync(Base.metadata.create_all)
 
+        # Índice HNSW para búsqueda vectorial eficiente a escala
+        try:
+            await conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_document_nodes_embedding_hnsw
+                ON document_nodes
+                USING hnsw (embedding vector_cosine_ops)
+                WITH (m = 16, ef_construction = 64)
+            """))
+        except Exception as e:
+            print(f"Info HNSW index: {e}")
+
+        # Columna tsvector + índice GIN para búsqueda léxica (Hybrid Search)
+        try:
+            await conn.execute(text(
+                "ALTER TABLE document_nodes ADD COLUMN IF NOT EXISTS content_tsv tsvector"
+            ))
+        except Exception:
+            pass
+        try:
+            # Poblar tsvector en filas existentes
+            await conn.execute(text(
+                "UPDATE document_nodes SET content_tsv = to_tsvector('spanish', coalesce(content,'')) WHERE content_tsv IS NULL"
+            ))
+            # Índice GIN sobre el tsvector
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_document_nodes_content_gin ON document_nodes USING gin(content_tsv)"
+            ))
+        except Exception as e:
+            print(f"Info GIN index: {e}")
+
+
     yield
     await engine.dispose()
 

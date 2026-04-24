@@ -1,115 +1,211 @@
 """
 app/agents/tools/gamma_tools.py
 --------------------------------
-Herramientas reales de Function Calling para GammIA.
-search_tool conecta directamente a pgvector para RAG semántico.
-"""
-import asyncio
-from typing import List
-from sqlalchemy import create_engine, text, select
-from sqlalchemy.orm import Session
+Hybrid Search RAG con Reciprocal Rank Fusion (RRF).
 
+Arquitectura:
+  1. Búsqueda semántica  → pgvector HNSW (cosine distance)
+  2. Búsqueda léxica     → PostgreSQL GIN + tsvector (full-text)
+  3. Fusión RRF          → combina rankings para máxima precisión
+  4. RBAC               → filtra por tags según nivel de acceso
+
+RRF score = Σ  1 / (k + rank_i)   donde k=60 (constante estándar)
+"""
+from typing import List, Dict
 from app.core.config import settings
 
-# Engine síncrono para usar dentro de tools síncronas de function calling
+# ── Engine síncrono (tools son funciones síncronas en Function Calling) ───────
 _sync_engine = None
 
-def _get_sync_engine():
+def _get_engine():
     global _sync_engine
     if _sync_engine is None:
-        # Convertir URL asyncpg a psycopg2 para el engine síncrono de tools
-        sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+        sync_url = settings.DATABASE_URL.replace(
+            "postgresql+asyncpg://", "postgresql+psycopg2://"
+        )
         try:
-            from sqlalchemy import create_engine as ce
-            _sync_engine = ce(sync_url, pool_pre_ping=True, pool_size=2, max_overflow=0)
+            from sqlalchemy import create_engine
+            _sync_engine = create_engine(
+                sync_url, pool_pre_ping=True, pool_size=3, max_overflow=2
+            )
         except Exception as e:
             print(f"Warning: no se pudo crear sync engine: {e}")
-            _sync_engine = None
     return _sync_engine
 
 
-def _embed_query_sync(query_text: str) -> List[float]:
-    """Genera embedding síncrono para la consulta del usuario."""
+def _embed(text: str) -> List[float]:
+    """Genera embedding semántico con gemini-embedding-001."""
     try:
         from google import genai
         client = genai.Client(api_key=settings.GOOGLE_API_KEY)
-        response = client.models.embed_content(
+        resp = client.models.embed_content(
             model="models/gemini-embedding-001",
-            contents=[query_text]
+            contents=[text]
         )
-        return response.embeddings[0].values
+        return resp.embeddings[0].values
     except Exception as e:
-        print(f"Warning: embedding fallido en search_tool: {e}")
+        print(f"Warning: embedding fallido: {e}")
         return [0.0] * 3072
 
 
+def _rrf_score(rank: int, k: int = 60) -> float:
+    return 1.0 / (k + rank)
+
+
+def _hybrid_search(
+    query: str,
+    is_internal: bool,
+    top_k: int = 5,
+    candidate_k: int = 20,
+) -> List[Dict]:
+    """
+    Hybrid Search con RRF.
+    
+    Parámetros:
+        query       : pregunta del usuario
+        is_internal : True = acceso total, False = solo tags 'public'
+        top_k       : número final de chunks a retornar
+        candidate_k : candidatos por cada rama (semántica + léxica)
+    """
+    engine = _get_engine()
+    if not engine:
+        return []
+
+    # RBAC tag filter
+    tag_filter = "" if is_internal else "AND 'public' = ANY(tags)"
+
+    # ── 1. Búsqueda semántica (HNSW cosine) ───────────────────────────────
+    semantic_results = {}
+    try:
+        vec = _embed(query)
+        vec_str = "[" + ",".join(str(v) for v in vec) + "]"
+
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            rows = conn.execute(text(f"""
+                SELECT id, title, content, tags,
+                       (embedding <=> '{vec_str}'::vector) AS distance
+                FROM document_nodes
+                WHERE active = 1 {tag_filter}
+                  AND embedding IS NOT NULL
+                ORDER BY embedding <=> '{vec_str}'::vector
+                LIMIT :k
+            """), {"k": candidate_k}).fetchall()
+
+        for rank, row in enumerate(rows):
+            semantic_results[row.id] = {
+                "id": row.id, "title": row.title,
+                "content": row.content, "tags": row.tags,
+                "semantic_rank": rank + 1,
+                "lexical_rank": None,
+            }
+    except Exception as e:
+        print(f"Semantic search error: {e}")
+
+    # ── 2. Búsqueda léxica (GIN full-text) ───────────────────────────────
+    lexical_results = {}
+    try:
+        # Normalizar query para tsquery: unir palabras con &
+        words = [w.strip() for w in query.split() if len(w.strip()) > 2]
+        tsquery = " | ".join(words) if words else query
+
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            rows = conn.execute(text(f"""
+                SELECT id, title, content, tags,
+                       ts_rank(content_tsv, plainto_tsquery('spanish', :q)) AS rank
+                FROM document_nodes
+                WHERE active = 1 {tag_filter}
+                  AND content_tsv @@ plainto_tsquery('spanish', :q)
+                ORDER BY rank DESC
+                LIMIT :k
+            """), {"q": query, "k": candidate_k}).fetchall()
+
+        for rank, row in enumerate(rows):
+            lexical_results[row.id] = {
+                "id": row.id, "title": row.title,
+                "content": row.content, "tags": row.tags,
+                "semantic_rank": None,
+                "lexical_rank": rank + 1,
+            }
+    except Exception as e:
+        print(f"Lexical search error: {e}")
+
+    # ── 3. Fusión RRF ─────────────────────────────────────────────────────
+    all_ids = set(semantic_results.keys()) | set(lexical_results.keys())
+    fused = []
+
+    for doc_id in all_ids:
+        sem = semantic_results.get(doc_id)
+        lex = lexical_results.get(doc_id)
+
+        # Tomar metadata del que exista
+        meta = sem or lex
+
+        sem_score = _rrf_score(sem["semantic_rank"]) if sem and sem["semantic_rank"] else 0.0
+        lex_score = _rrf_score(lex["lexical_rank"])  if lex and lex["lexical_rank"]  else 0.0
+        rrf = sem_score + lex_score
+
+        fused.append({
+            "id": meta["id"],
+            "title": meta["title"],
+            "content": meta["content"],
+            "tags": meta["tags"],
+            "rrf_score": round(rrf, 6),
+            "source": (
+                "hybrid"   if sem and lex else
+                "semantic" if sem        else "lexical"
+            ),
+        })
+
+    # Ordenar por RRF descendente y devolver top_k
+    fused.sort(key=lambda x: x["rrf_score"], reverse=True)
+    return fused[:top_k]
+
+
+# ── Herramientas de Function Calling ─────────────────────────────────────────
+
 def search_tool(query: str, is_internal: bool = False, top_k: int = 5) -> str:
     """
-    Busca en la base de datos vectorial (pgvector) los fragmentos más relevantes
-    para responder la consulta. Filtra por tags según el nivel de acceso del usuario.
-    Usar cuando necesites contexto interno de Gamma Ingenieros: políticas, servicios,
-    portafolio, procedimientos, clientes o cualquier documento corporativo.
+    Busca en la base de datos vectorial interna de Gamma Ingenieros usando Hybrid Search
+    (búsqueda semántica + léxica con fusión RRF). Retorna los fragmentos más relevantes
+    del conocimiento corporativo: políticas, portafolio, servicios, procedimientos y clientes.
+    Usar siempre que necesites información específica de Gamma Ingenieros.
     """
-    engine = _get_sync_engine()
-    if not engine:
-        return "[RAG no disponible — error de conexión a la BD]"
+    chunks = _hybrid_search(query, is_internal=is_internal, top_k=top_k)
 
-    try:
-        query_embedding = _embed_query_sync(query)
-        embedding_str = "[" + ",".join(str(v) for v in query_embedding) + "]"
+    if not chunks:
+        scope = "intranet" if is_internal else "base pública"
+        return f"[RAG] No se encontraron documentos relevantes en la {scope} para: '{query}'"
 
-        # RBAC: usuarios internos ven todo, externos solo tags 'public'
-        if is_internal:
-            tag_filter = ""  # sin filtro de tags
-        else:
-            tag_filter = "AND 'public' = ANY(tags)"
+    parts = []
+    for i, c in enumerate(chunks, 1):
+        tags_str = ", ".join(c["tags"]) if c["tags"] else "—"
+        source_badge = {"hybrid": "⊕", "semantic": "◈", "lexical": "◉"}.get(c["source"], "○")
+        parts.append(
+            f"[{i}] {source_badge} {c['title']} | tags: {tags_str} | RRF: {c['rrf_score']}\n"
+            f"{c['content']}"
+        )
 
-        sql = text(f"""
-            SELECT title, content, tags,
-                   (embedding <=> '{embedding_str}'::vector) AS distance
-            FROM document_nodes
-            WHERE active = 1 {tag_filter}
-            ORDER BY embedding <=> '{embedding_str}'::vector
-            LIMIT :top_k
-        """)
-
-        with engine.connect() as conn:
-            rows = conn.execute(sql, {"top_k": top_k}).fetchall()
-
-        if not rows:
-            scope = "intranet" if is_internal else "pública"
-            return f"[No se encontraron documentos relevantes en la base {scope} para: '{query}']"
-
-        # Construir contexto para el LLM
-        context_parts = []
-        for i, row in enumerate(rows, 1):
-            tags_str = ", ".join(row.tags) if row.tags else "sin tags"
-            context_parts.append(
-                f"[Fragmento {i} — {row.title} | tags: {tags_str}]\n{row.content}"
-            )
-
-        context = "\n\n---\n\n".join(context_parts)
-        scope = "INTERNO" if is_internal else "PÚBLICO"
-        return f"=== CONTEXTO RAG ({scope}) ===\n\n{context}\n\n=== FIN CONTEXTO ==="
-
-    except Exception as e:
-        print(f"Error en search_tool: {e}")
-        return f"[Error consultando la base vectorial: {str(e)[:200]}]"
+    scope_label = "INTERNO" if is_internal else "PÚBLICO"
+    return (
+        f"=== CONTEXTO RAG HYBRID ({scope_label}) — {len(chunks)} fragmentos ===\n\n"
+        + "\n\n---\n\n".join(parts)
+        + "\n\n=== FIN CONTEXTO ==="
+    )
 
 
 def salesforce_connector(consulta_cliente: str) -> str:
     """
-    Consulta el CRM de Salesforce para obtener el estado de servicios o tickets de clientes.
-    Usar cuando el usuario pregunte sobre el estado de un proyecto, contrato o cliente específico.
+    Consulta el CRM de Salesforce para obtener estado de servicios o tickets de clientes.
+    Usar cuando el usuario pregunte sobre un proyecto, contrato o cliente específico.
     """
-    # TODO: integrar con Salesforce API real
-    return f"[Salesforce CRM] Consultando estado para: {consulta_cliente}. Integración pendiente de credenciales OAuth."
+    return f"[Salesforce CRM] Consultando: {consulta_cliente}. Integración pendiente de credenciales OAuth."
 
 
 def workspace_integration(accion: str) -> str:
     """
-    Interactúa con Google Workspace: envía correos, agenda citas o crea eventos en el calendario corporativo.
+    Interactúa con Google Workspace: envía correos, agenda citas o crea eventos.
     Usar solo cuando el usuario solicite explícitamente agendar, enviar correo o crear un evento.
     """
-    # TODO: integrar con Google Workspace API real
     return f"[Google Workspace] Acción registrada: {accion}. Integración pendiente de Service Account."

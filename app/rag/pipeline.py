@@ -148,6 +148,18 @@ class GammiaRAGPipeline:
             new_nodes.append(node)
 
         await self.db.commit()
+
+        # Actualizar tsvector para Hybrid Search (léxica)
+        try:
+            from sqlalchemy import text
+            await self.db.execute(text(
+                "UPDATE document_nodes SET content_tsv = to_tsvector('spanish', coalesce(content,'')) "
+                "WHERE doc_id = :doc_id AND content_tsv IS NULL"
+            ), {"doc_id": doc_id})
+            await self.db.commit()
+        except Exception as e:
+            print(f"Warning: no se pudo actualizar content_tsv: {e}")
+
         return {"status": "success", "chunks_inserted": len(new_nodes), "version": version, "ai_validation": "passed"}
 
     async def execute_approved_deletion(self, doc_id: str):
