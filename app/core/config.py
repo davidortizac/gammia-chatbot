@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: str = ""
     # Google Service Account (para Drive sync)
     GOOGLE_SERVICE_ACCOUNT_FILE: str = "/app/service_account.json"
+    # Widget embeddable
+    WIDGET_INTERNAL_SECRET: str = ""   # Set en .env para acceso interno desde Google Sites
     # Google Workspace OAuth
     GOOGLE_CLIENT_ID: Optional[str] = None
     

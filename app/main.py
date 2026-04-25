@@ -1,10 +1,13 @@
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, FileResponse
 from contextlib import asynccontextmanager
+import os
 
 from app.core.config import settings
 from app.db.database import engine, Base
-from app.api.endpoints import chat, rag, analytics
+from app.api.endpoints import chat, rag, analytics, widget
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -82,6 +85,42 @@ app.add_middleware(
 app.include_router(chat.router, prefix="/api/v1", tags=["Chat & Orchestration"])
 app.include_router(rag.router, prefix="/api/v1/rag", tags=["Vector RAG Sync"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Commercial Analytics"])
+app.include_router(widget.router, prefix="/api/v1/widget", tags=["Chatbot Widget"])
+
+# Servir archivos estáticos (widget JS, demo page)
+static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
+if os.path.isdir(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+@app.get("/widget", response_class=HTMLResponse)
+async def widget_page(request: Request, ctx: str = "public", secret: str = ""):
+    """Sirve el widget como página standalone (para iFrame en Google Sites)."""
+    demo_file = os.path.join(static_dir, "widget-iframe.html")
+    if os.path.exists(demo_file):
+        return FileResponse(demo_file)
+    # Fallback inline si no existe el archivo
+    api_base = str(request.base_url).rstrip("/")
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>*{{margin:0;padding:0;box-sizing:border-box}}body{{background:#0B1120;height:100vh;display:flex;align-items:flex-end;justify-content:flex-end}}</style>
+</head><body>
+<script src="{api_base}/static/gammia-widget.js"
+  data-context="{ctx}" data-secret="{secret}"
+  data-theme="dark" data-api="{api_base}"></script>
+<script>window.onload=function(){{setTimeout(function(){{
+  var b=document.getElementById('gammia-widget-btn');
+  if(b)b.click();
+}},400)}}</script>
+</body></html>""")
+
+@app.get("/widget/demo", response_class=HTMLResponse)
+async def widget_demo():
+    """Página de documentación e integración del widget."""
+    demo_file = os.path.join(static_dir, "widget-demo.html")
+    if os.path.exists(demo_file):
+        return FileResponse(demo_file)
+    return HTMLResponse("<h1>Demo no disponible</h1>")
 
 @app.get("/")
 async def root():
