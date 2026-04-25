@@ -84,26 +84,38 @@
   style.textContent = `
     #gammia-widget-btn {
       position: fixed;
-      ${POSITION === 'left' ? 'left: 24px;' : 'right: 24px;'}
-      bottom: 24px;
-      width: 56px; height: 56px;
+      ${POSITION === 'left' ? 'left: 20px;' : 'right: 20px;'}
+      bottom: 20px;
+      width: 76px; height: 76px;
       border-radius: 50%;
-      background: linear-gradient(135deg, ${p.accent}, #059669);
+      background: #fff;
       border: none;
       cursor: pointer;
-      box-shadow: 0 4px 20px ${p.shadow}, 0 0 0 0 ${p.accent}40;
+      box-shadow: 0 6px 24px ${p.shadow}, 0 0 0 0 #F472B640;
       display: flex; align-items: center; justify-content: center;
       z-index: 999998;
-      transition: transform .2s, box-shadow .2s;
-      animation: gammia-pulse 2.5s infinite;
+      transition: transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s;
+      animation: gammia-float 3s ease-in-out infinite;
+      padding: 0; overflow: hidden;
     }
-    #gammia-widget-btn:hover { transform: scale(1.1); box-shadow: 0 6px 28px ${p.shadow}; }
-    #gammia-widget-btn svg { width: 26px; height: 26px; fill: white; }
+    #gammia-widget-btn:hover { transform: scale(1.12) translateY(-3px); box-shadow: 0 10px 32px ${p.shadow}; }
+    #gammia-widget-btn:active { transform: scale(0.96); }
+    #gammia-widget-btn img {
+      width: 100%; height: 100%; object-fit: cover;
+      transition: opacity .2s;
+    }
+    #gammia-widget-btn .gammia-btn-close {
+      display: none; width: 32px; height: 32px;
+      stroke: #6B7280; fill: none; stroke-width: 2.5; stroke-linecap: round;
+    }
+    #gammia-widget-btn.gammia-btn-open img { opacity: 0.15; }
+    #gammia-widget-btn.gammia-btn-open .gammia-btn-close { display: block; position: absolute; }
 
-    @keyframes gammia-pulse {
-      0%,100% { box-shadow: 0 4px 20px ${p.shadow}, 0 0 0 0 ${p.accent}60; }
-      50%      { box-shadow: 0 4px 20px ${p.shadow}, 0 0 0 10px ${p.accent}00; }
+    @keyframes gammia-float {
+      0%,100% { transform: translateY(0px); }
+      50%      { transform: translateY(-8px); }
     }
+    #gammia-widget-btn.gammia-btn-open { animation: none; }
 
     #gammia-widget-panel {
       position: fixed;
@@ -142,12 +154,13 @@
       flex-shrink: 0;
     }
     .gammia-avatar {
-      width: 36px; height: 36px; border-radius: 50%;
-      background: linear-gradient(135deg, ${p.accent}, #059669);
+      width: 40px; height: 40px; border-radius: 50%;
+      background: #fff;
       display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
+      flex-shrink: 0; overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
-    .gammia-avatar svg { width: 18px; height: 18px; fill: white; }
+    .gammia-avatar img { width: 100%; height: 100%; object-fit: cover; }
     .gammia-header-info { flex: 1; }
     .gammia-header-name { font-size: 14px; font-weight: 700; color: ${p.text}; }
     .gammia-header-sub  { font-size: 11px; color: ${p.accent}; margin-top: 1px; }
@@ -264,9 +277,9 @@
   `;
   document.head.appendChild(style);
 
-  // ── SVG Icons ──────────────────────────────────────────────────────────────
-  const ICON_BOT  = `<svg viewBox="0 0 24 24"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7H3a7 7 0 0 1 7-7h1V5.73A2 2 0 0 1 10 4a2 2 0 0 1 2-2zM5 14v1a7 7 0 0 0 14 0v-1H5zm4 2h2v1H9v-1zm4 0h2v1h-2v-1z"/></svg>`;
-  const ICON_SEND = `<svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>`;
+  // ── Icons & Images ─────────────────────────────────────────────────────────
+  const AVATAR_URL = `${API_BASE}/static/gammia-avatar.png`;
+  const ICON_SEND  = `<svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>`;
   const ICON_CLOSE = `<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
 
   // ── DOM ────────────────────────────────────────────────────────────────────
@@ -277,14 +290,14 @@
     panel.setAttribute('aria-label', `${BOT_NAME} chat`);
     panel.innerHTML = `
       <div class="gammia-header">
-        <div class="gammia-avatar">${ICON_BOT}</div>
+        <div class="gammia-avatar"><img src="${AVATAR_URL}" alt="GammIA" onerror="this.style.display='none'"/></div>
         <div class="gammia-header-info">
           <div class="gammia-header-name">${BOT_NAME}</div>
           <div class="gammia-header-sub">${BOT_SUB}</div>
         </div>
         <div class="gammia-status"><div class="gammia-dot"></div>En línea</div>
         <button class="gammia-close-btn" id="gammia-close" aria-label="Cerrar chat">${ICON_CLOSE}</button>
-      </div>
+      </div>`;
       <div class="gammia-messages" id="gammia-messages"></div>
       <div class="gammia-footer">
         <div class="gammia-input-row">
@@ -298,6 +311,23 @@
         </div>
       </div>
     `;
+    // Append rest of panel separately (header already set)
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'gammia-messages'; msgDiv.id = 'gammia-messages';
+    const footer = document.createElement('div');
+    footer.className = 'gammia-footer';
+    footer.innerHTML = `
+      <div class="gammia-input-row">
+        <textarea class="gammia-input" id="gammia-input"
+          placeholder="Escribe tu pregunta..." rows="1"
+          maxlength="500" aria-label="Mensaje"></textarea>
+        <button class="gammia-send-btn" id="gammia-send" aria-label="Enviar">${ICON_SEND}</button>
+      </div>
+      <div class="gammia-powered">
+        Powered by <a href="https://gammaingenieros.com" target="_blank">Gamma Ingenieros</a> · GammIA AI
+      </div>`;
+    panel.appendChild(msgDiv);
+    panel.appendChild(footer);
     return panel;
   }
 
@@ -305,7 +335,12 @@
     const btn = document.createElement('button');
     btn.id = 'gammia-widget-btn';
     btn.setAttribute('aria-label', 'Abrir chat GammIA');
-    btn.innerHTML = ICON_BOT;
+    btn.innerHTML = `
+      <img src="${AVATAR_URL}" alt="GammIA" onerror="this.style.display='none'"/>
+      <svg class="gammia-btn-close" viewBox="0 0 24 24">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>`;
     return btn;
   }
 
@@ -423,8 +458,14 @@
     }, 300);
 
     // Events
-    btn.addEventListener('click', () => isOpen ? closeChat() : openChat());
-    document.getElementById('gammia-close').addEventListener('click', closeChat);
+    btn.addEventListener('click', () => {
+      if (isOpen) { closeChat(); btn.classList.remove('gammia-btn-open'); }
+      else         { openChat();  btn.classList.add('gammia-btn-open'); }
+    });
+    document.getElementById('gammia-close').addEventListener('click', () => {
+      closeChat();
+      btn.classList.remove('gammia-btn-open');
+    });
 
     const input = document.getElementById('gammia-input');
     const sendBtn = document.getElementById('gammia-send');
