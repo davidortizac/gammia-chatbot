@@ -40,6 +40,10 @@ const DEFAULT_CONFIG = {
   max_interactions:  10,
   chat_width:        370,
   chat_height:       560,
+  llm_temperature:   0.1,
+  llm_top_p:         0.95,
+  llm_top_k:         40,
+  rag_top_k:         15,
 };
 
 function Section({ title, icon: Icon, children, defaultOpen = true }) {
@@ -508,6 +512,25 @@ export default function WidgetView() {
                 <NumberField label="Ancho del panel"          name="chat_width"       value={cfg.chat_width}       onChange={update} min={280} max={600} unit="px" />
                 <NumberField label="Alto máximo del panel"    name="chat_height"      value={cfg.chat_height}      onChange={update} min={300} max={900} unit="px" />
                 <NumberField label="Máximo de interacciones por sesión" name="max_interactions" value={cfg.max_interactions} onChange={update} min={1} max={50} unit="msgs" />
+              </div>
+            </Section>
+
+            {/* Configuración LLM y RAG */}
+            <Section title="Comportamiento del Modelo (LLM)" icon={Type} defaultOpen={false}>
+              <div className="pt-3 space-y-3">
+                <div className="bg-[#3d3d3d]/40 border border-[#4a4a4a]/50 rounded-xl p-3 text-xs text-slate-400 mb-2">
+                  Ajusta cómo piensa y responde la IA. Cambios aplican de inmediato.
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between"><label className="text-xs text-slate-400">Temperatura (Creatividad)</label><span className="text-xs font-mono">{cfg.llm_temperature}</span></div>
+                  <input type="range" min="0" max="2" step="0.1" value={cfg.llm_temperature ?? 0.1} onChange={e => update('llm_temperature', parseFloat(e.target.value))} className="w-full accent-[#168bf2]" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between"><label className="text-xs text-slate-400">Top-P (Probabilidad acumulada)</label><span className="text-xs font-mono">{cfg.llm_top_p}</span></div>
+                  <input type="range" min="0" max="1" step="0.05" value={cfg.llm_top_p ?? 0.95} onChange={e => update('llm_top_p', parseFloat(e.target.value))} className="w-full accent-[#168bf2]" />
+                </div>
+                <NumberField label="Top-K (Tokens candidatos)" name="llm_top_k" value={cfg.llm_top_k} onChange={update} min={1} max={100} />
+                <NumberField label="RAG Top-K (Fragmentos DB a inyectar)" name="rag_top_k" value={cfg.rag_top_k} onChange={update} min={1} max={40} />
               </div>
             </Section>
           </div>

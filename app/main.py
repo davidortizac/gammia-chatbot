@@ -63,6 +63,10 @@ async def _init_db():
         ("max_interactions",  "INTEGER DEFAULT 10"),
         ("chat_width",        "INTEGER DEFAULT 370"),
         ("chat_height",       "INTEGER DEFAULT 560"),
+        ("llm_temperature",   "FLOAT DEFAULT 0.1"),
+        ("llm_top_p",         "FLOAT DEFAULT 0.95"),
+        ("llm_top_k",         "INTEGER DEFAULT 40"),
+        ("rag_top_k",         "INTEGER DEFAULT 15"),
     ]:
         try:
             async with engine.begin() as conn:

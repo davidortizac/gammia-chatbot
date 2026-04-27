@@ -202,7 +202,7 @@ async def widget_chat(
         from google.genai import types
         from app.agents.tools.gamma_tools import search_tool
 
-        rag_context = search_tool(body.message, is_internal=ctx["is_internal"], top_k=15)
+        rag_context = search_tool(body.message, is_internal=ctx["is_internal"], top_k=cfg.rag_top_k)
 
         if ctx["is_internal"]:
             system = (
@@ -234,7 +234,9 @@ async def widget_chat(
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system,
-                temperature=0.1,
+                temperature=cfg.llm_temperature,
+                top_p=cfg.llm_top_p,
+                top_k=cfg.llm_top_k,
                 max_output_tokens=4096,
             ),
         )

@@ -102,6 +102,12 @@ class WidgetConfig(Base):
     max_interactions = Column(Integer, default=10)
     chat_width       = Column(Integer, default=370)
     chat_height      = Column(Integer, default=560)
+    
+    # ── LLM & RAG Config ───────────────────────────────────────────────────────
+    llm_temperature  = Column(Float, default=0.1)
+    llm_top_p        = Column(Float, default=0.95)
+    llm_top_k        = Column(Integer, default=40)
+    rag_top_k        = Column(Integer, default=15)
 
 
 class AdminUser(Base):
