@@ -22,6 +22,15 @@ class Settings(BaseSettings):
     WIDGET_INTERNAL_SECRET: str = ""   # Set en .env para acceso interno desde Google Sites
     # Google Workspace OAuth
     GOOGLE_CLIENT_ID: Optional[str] = None
+
+    # JWT Admin Auth
+    JWT_SECRET_KEY: str = "changeme-super-secret-key-replace-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 horas
+
+    # Default admin account (seeded on first startup)
+    ADMIN_DEFAULT_EMAIL: str = "admin@gammaingenieros.com"
+    ADMIN_DEFAULT_PASSWORD: str = "Gamma2024!"
     
     # System Prompt (Identity)
     SYSTEM_PROMPT: str = """

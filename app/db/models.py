@@ -5,7 +5,6 @@ from app.db.database import Base
 try:
     from pgvector.sqlalchemy import Vector
 except ImportError:
-    # Placeholder si pgvector no está instalado localmente, no falla la generación en desarrollo.
     from sqlalchemy.types import UserDefinedType
     class Vector(UserDefinedType):
         def get_col_spec(self):
@@ -13,74 +12,118 @@ except ImportError:
 
 class InteractionLog(Base):
     __tablename__ = "interaction_logs"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
-    user_id = Column(String, index=True) # Requerimiento: user_id
-    tokens_in = Column(Integer)          # Requerimiento: tokens_in
-    tokens_out = Column(Integer)         # Requerimiento: tokens_out
-    latency_ms = Column(Integer)         # Requerimiento: latency
-    source_used = Column(String)         # Requerimiento: source_used (Ej: Intranet, Web, Salesforce)
-    
-    # Adicionales útiles para analítica
+    user_id = Column(String, index=True)
+    session_id = Column(String, index=True, nullable=True)   # widget session tracking
+    tokens_in = Column(Integer)
+    tokens_out = Column(Integer)
+    latency_ms = Column(Integer)
+    source_used = Column(String)
     user_query = Column(Text)
     assistant_response = Column(Text)
-    sentiment_score = Column(Float, nullable=True) # Para el requerimiento analítico
+    sentiment_score = Column(Float, nullable=True)
 
 
 class DocumentNode(Base):
-    """
-    Modelo para la Base de Datos Vectorial (RAG).
-    Almacena los fragmentos indexados listos para búsqueda por similitud.
-    """
     __tablename__ = "document_nodes"
 
     id = Column(Integer, primary_key=True, index=True)
-    doc_id = Column(String, index=True)     # Ej: "1A2B3C_manual_seguridad" (Google Drive ID)
+    doc_id = Column(String, index=True)
     title = Column(String)
     version = Column(Integer, default=1)
-    doc_hash = Column(String, index=True)   # Hash MD5 para detectar cambios
-    source_type = Column(String, index=True) # "intranet_drive", "web"
-    
-    # ARRAY of strings for Metadata/RBAC tagging
-    tags = Column(ARRAY(String), default=["general"]) 
-
-    content = Column(Text)                  # El chunk de texto
-    # gemini-embedding-001 produce 3072 dimensiones
-    embedding = Column(Vector(3072)) 
-    
-    active = Column(Integer, default=1)     # 1 = activo, 0 = obsoleto
+    doc_hash = Column(String, index=True)
+    source_type = Column(String, index=True)
+    tags = Column(ARRAY(String), default=["general"])
+    content = Column(Text)
+    embedding = Column(Vector(3072))
+    active = Column(Integer, default=1)
     last_updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+
 class DocumentDeletionRequest(Base):
-    """
-    Tabla de auditoría para aprobaciones Human-in-the-Loop.
-    Registra quién intentó borrar o sobreescribir un documento en el RAG.
-    """
     __tablename__ = "document_deletion_requests"
 
     id = Column(Integer, primary_key=True, index=True)
     doc_id = Column(String, index=True)
-    requested_by = Column(String)      # Usuario/Sistema que pidió borrar
-    reason = Column(String)            # "manual_delete" o "version_update"
-    new_hash_to_upsert = Column(String, nullable=True) # Si es un update, guardamos el hash a esperar
-    
-    status = Column(String, default="PENDING") # "PENDING", "APPROVED", "REJECTED"
+    requested_by = Column(String)
+    reason = Column(String)
+    new_hash_to_upsert = Column(String, nullable=True)
+    status = Column(String, default="PENDING")
     approved_by = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     approved_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class Tag(Base):
-    """
-    Tags del sistema para clasificación RBAC de documentos.
-    Los tags del sistema (is_system=True) no se pueden eliminar.
-    Los tags personalizados se crean desde el panel de admin.
-    """
     __tablename__ = "tags"
 
-    id = Column(String, primary_key=True)     # ej: "csoc", "marketing"
-    label = Column(String, nullable=False)    # ej: "CSOC", "Marketing"
-    color = Column(String, default="slate")   # ej: "emerald", "red"
-    is_system = Column(Boolean, default=False) # True = no se puede eliminar
+    id = Column(String, primary_key=True)
+    label = Column(String, nullable=False)
+    color = Column(String, default="slate")
+    is_system = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class WidgetConfig(Base):
+    """Configuración dinámica del Chatbot Widget — editable desde el panel admin."""
+    __tablename__ = "widget_config"
+
+    id = Column(Integer, primary_key=True)
+
+    # ── Colores ────────────────────────────────────────────────────────────────
+    primary_color    = Column(String, default="#10B981")
+    secondary_color  = Column(String, default="#064E3B")
+    background_color = Column(String, default="#0B1120")
+    surface_color    = Column(String, default="#111827")
+    surface2_color   = Column(String, default="#1E293B")
+    user_bubble_color = Column(String, default="#10B981")
+    bot_bubble_color  = Column(String, default="#1E293B")
+    text_color       = Column(String, default="#E2E8F0")
+    border_color     = Column(String, default="#1E293B")
+
+    # ── Tipografía ─────────────────────────────────────────────────────────────
+    font_family = Column(String, default="'Inter', sans-serif")
+    font_size   = Column(String, default="13px")
+
+    # ── Contenido ──────────────────────────────────────────────────────────────
+    title    = Column(String, default="GammIA")
+    subtitle = Column(String, default="Asistente Virtual · Gamma Ingenieros")
+    greeting_public   = Column(Text, default="¡Hola! Soy GammIA, asistente virtual de Gamma Ingenieros. Puedo ayudarte con información sobre nuestros servicios de ciberseguridad. ¿Tienes alguna pregunta?")
+    greeting_internal = Column(Text, default="¡Hola! Soy GammIA, tu asistente de intranet. Tengo acceso a la base de conocimiento interna de Gamma Ingenieros. ¿En qué te puedo ayudar?")
+
+    # ── Icono / Avatar ─────────────────────────────────────────────────────────
+    avatar_url    = Column(String, default="/static/gammia-avatar.png")
+    bot_icon_type = Column(String, default="avatar")   # avatar | letter | custom
+
+    # ── Configuración general ──────────────────────────────────────────────────
+    theme            = Column(String,  default="dark")   # dark | light
+    max_interactions = Column(Integer, default=10)
+    chat_width       = Column(Integer, default=370)
+    chat_height      = Column(Integer, default=560)
+
+
+class AdminUser(Base):
+    """Usuarios del panel de administración con autenticación JWT."""
+    __tablename__ = "admin_users"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    email        = Column(String, unique=True, index=True, nullable=False)
+    full_name    = Column(String, nullable=True)
+    hashed_password = Column(String, nullable=False)
+    role         = Column(String, default="admin")   # admin | superadmin
+    is_active    = Column(Boolean, default=True)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+    created_by   = Column(String, nullable=True)     # email of creator
+
+
+class WidgetSession(Base):
+    """Sesión de widget: limita a max_interactions por sesión y audita conversaciones."""
+    __tablename__ = "widget_sessions"
+
+    id                   = Column(String, primary_key=True)   # session_id
+    context              = Column(String)
+    interaction_count    = Column(Integer, default=0)
+    created_at           = Column(DateTime(timezone=True), server_default=func.now())
+    last_interaction_at  = Column(DateTime(timezone=True), nullable=True)

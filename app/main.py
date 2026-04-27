@@ -7,7 +7,7 @@ import os
 
 from app.core.config import settings
 from app.db.database import engine, Base
-from app.api.endpoints import chat, rag, analytics, widget
+from app.api.endpoints import chat, rag, analytics, widget, admin_auth
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,6 +29,73 @@ async def lifespan(app: FastAPI):
 
         # Crear todas las tablas (incluyendo la nueva tabla 'tags')
         await conn.run_sync(Base.metadata.create_all)
+
+        # ── Parches WidgetConfig (nuevas columnas) ────────────────────────────
+        widget_col_patches = [
+            ("secondary_color",   "VARCHAR DEFAULT '#064E3B'"),
+            ("background_color",  "VARCHAR DEFAULT '#0B1120'"),
+            ("surface_color",     "VARCHAR DEFAULT '#111827'"),
+            ("surface2_color",    "VARCHAR DEFAULT '#1E293B'"),
+            ("user_bubble_color", "VARCHAR DEFAULT '#10B981'"),
+            ("bot_bubble_color",  "VARCHAR DEFAULT '#1E293B'"),
+            ("text_color",        "VARCHAR DEFAULT '#E2E8F0'"),
+            ("border_color",      "VARCHAR DEFAULT '#1E293B'"),
+            ("subtitle",          "VARCHAR DEFAULT 'Asistente Virtual · Gamma Ingenieros'"),
+            ("bot_icon_type",     "VARCHAR DEFAULT 'avatar'"),
+            ("theme",             "VARCHAR DEFAULT 'dark'"),
+            ("max_interactions",  "INTEGER DEFAULT 10"),
+            ("chat_width",        "INTEGER DEFAULT 370"),
+            ("chat_height",       "INTEGER DEFAULT 560"),
+        ]
+        for col, type_def in widget_col_patches:
+            try:
+                await conn.execute(text(
+                    f"ALTER TABLE widget_config ADD COLUMN IF NOT EXISTS {col} {type_def}"
+                ))
+            except Exception:
+                pass
+
+        # ── Parches InteractionLog / WidgetSession ────────────────────────────
+        try:
+            await conn.execute(text(
+                "ALTER TABLE interaction_logs ADD COLUMN IF NOT EXISTS session_id VARCHAR"
+            ))
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_interaction_logs_session_id ON interaction_logs (session_id)"
+            ))
+        except Exception:
+            pass
+        try:
+            await conn.execute(text(
+                "ALTER TABLE widget_sessions ADD COLUMN IF NOT EXISTS last_interaction_at TIMESTAMPTZ"
+            ))
+        except Exception:
+            pass
+
+        # ── Sembrar configuración inicial del widget si no existe ─────────────
+        from app.db.models import WidgetConfig, AdminUser
+        from app.core.auth import hash_password
+        from sqlalchemy.ext.asyncio import AsyncSession
+        async with AsyncSession(engine) as session:
+            result = await session.execute(text("SELECT id FROM widget_config WHERE id=1"))
+            if not result.scalar():
+                session.add(WidgetConfig(id=1))
+                await session.commit()
+
+        # ── Sembrar admin por defecto si no existe ninguno ────────────────────
+        async with AsyncSession(engine) as session:
+            result = await session.execute(text("SELECT id FROM admin_users LIMIT 1"))
+            if not result.scalar():
+                default_admin = AdminUser(
+                    email=settings.ADMIN_DEFAULT_EMAIL,
+                    full_name="Administrador Principal",
+                    hashed_password=hash_password(settings.ADMIN_DEFAULT_PASSWORD),
+                    role="superadmin",
+                    created_by="system",
+                )
+                session.add(default_admin)
+                await session.commit()
+                print(f"[GammIA] Admin por defecto creado: {settings.ADMIN_DEFAULT_EMAIL}")
 
         # Índice HNSW para búsqueda vectorial eficiente a escala
         try:
@@ -82,6 +149,7 @@ app.add_middleware(
 )
 
 # Register routes
+app.include_router(admin_auth.router, prefix="/api/v1/auth", tags=["Admin Auth"])
 app.include_router(chat.router, prefix="/api/v1", tags=["Chat & Orchestration"])
 app.include_router(rag.router, prefix="/api/v1/rag", tags=["Vector RAG Sync"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Commercial Analytics"])

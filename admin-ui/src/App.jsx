@@ -1,11 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Sidebar from './components/Sidebar';
 import DashboardView from './views/DashboardView';
 import RagView from './views/RagView';
 import ToolsView from './views/ToolsView';
+import WidgetView from './views/WidgetView';
+import LoginView from './views/LoginView';
+import AdminUsersView from './views/AdminUsersView';
 
-// Modal global - renderizado en document.body, fuera de cualquier stacking context
+const TOKEN_KEY = 'gammia_admin_token';
+const USER_KEY  = 'gammia_admin_user';
+
+// Modal global renderizado en document.body, fuera de cualquier stacking context
 export function GlobalModal({ children, onClose }) {
   if (!children) return null;
   return createPortal(
@@ -23,26 +29,67 @@ export function GlobalModal({ children, onClose }) {
 }
 
 function App() {
+  const [token, setToken]       = useState(() => localStorage.getItem(TOKEN_KEY) || '');
+  const [user, setUser]         = useState(() => {
+    try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null'); } catch { return null; }
+  });
   const [activeView, setActiveView] = useState('dashboard');
+
+  function handleLogin(newToken, newUser) {
+    localStorage.setItem(TOKEN_KEY, newToken);
+    localStorage.setItem(USER_KEY, JSON.stringify(newUser));
+    setToken(newToken);
+    setUser(newUser);
+    setActiveView('dashboard');
+  }
+
+  function handleLogout() {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    setToken('');
+    setUser(null);
+  }
+
+  // Auto-logout if token is expired (basic client-side check)
+  useEffect(() => {
+    if (!token) return;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.exp && payload.exp * 1000 < Date.now()) handleLogout();
+    } catch {
+      handleLogout();
+    }
+  }, [token]);
+
+  if (!token || !user) {
+    return <LoginView onLogin={handleLogin} />;
+  }
 
   return (
     <div className="flex h-screen bg-[#0B1120] text-slate-300 font-sans selection:bg-emerald-500/30">
-      <Sidebar activeView={activeView} setActiveView={setActiveView} />
+      <Sidebar
+        activeView={activeView}
+        setActiveView={setActiveView}
+        user={user}
+        onLogout={handleLogout}
+      />
       <main className="flex-1 flex flex-col overflow-hidden relative">
-        <div className="absolute top-0 w-full h-40 bg-emerald-500/5 blur-[120px] pointer-events-none"></div>
+        <div className="absolute top-0 w-full h-40 bg-emerald-500/5 blur-[120px] pointer-events-none" />
         <header className="h-16 border-b border-slate-800/60 bg-slate-900/50 backdrop-blur-md flex items-center px-8 z-10 justify-between">
           <h1 className="text-xl font-medium tracking-tight text-white drop-shadow-sm">
             GammIA <span className="text-emerald-400 font-light ml-1">Centro de Comando</span>
           </h1>
           <div className="flex items-center gap-3">
-            <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)] animate-pulse"></div>
+            <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)] animate-pulse" />
             <span className="text-xs uppercase tracking-wider font-semibold text-emerald-500">API Online</span>
           </div>
         </header>
         <div className="flex-1 overflow-y-auto p-8 z-10 custom-scrollbar">
           {activeView === 'dashboard' && <DashboardView />}
-          {activeView === 'rag' && <RagView />}
-          {activeView === 'tools' && <ToolsView />}
+          {activeView === 'rag'       && <RagView />}
+          {activeView === 'widget'    && <WidgetView token={token} />}
+          {activeView === 'tools'     && <ToolsView />}
+          {activeView === 'users'     && <AdminUsersView token={token} currentUser={user} />}
         </div>
       </main>
     </div>

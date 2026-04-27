@@ -1,0 +1,63 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL + pgvector ──────────────────────────────────────────────────
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: gammia_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-gammia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gammia_secret}
+      POSTGRES_DB:       ${POSTGRES_DB:-gammiadb}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gammia} -d ${POSTGRES_DB:-gammiadb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gammia_net
+
+  # ── FastAPI Backend ────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gammia_backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-gammia}:${POSTGRES_PASSWORD:-gammia_secret}@db:5432/${POSTGRES_DB:-gammiadb}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./static:/app/static          # widget JS + demo pages
+      - ./service_account.json:/app/service_account.json:ro
+    ports:
+      - "8000:8000"
+    networks:
+      - gammia_net
+
+  # ── Admin UI (React + nginx) ───────────────────────────────────────────────
+  admin-ui:
+    build:
+      context: ./admin-ui
+      dockerfile: Dockerfile
+    container_name: gammia_admin
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    networks:
+      - gammia_net
+
+volumes:
+  pgdata:
+
+networks:
+  gammia_net:
+    driver: bridge
