@@ -10,11 +10,14 @@ Rutas:
   PUT  /api/v1/widget/admin/config     → actualizar configuración (admin)
   GET  /api/v1/widget/admin/sessions   → listar sesiones con historial de mensajes (admin)
 """
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, HTTPException, Request, Depends, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional, List
 import time
 import hashlib
+import os
+import shutil
+import uuid
 from datetime import datetime, timezone
 
 from app.core.config import settings
@@ -336,3 +339,29 @@ async def list_sessions(db: AsyncSession = Depends(get_db)):
         })
 
     return {"sessions": sessions_data, "total": len(sessions_data)}
+
+
+@router.post("/admin/avatar", dependencies=[Depends(get_current_admin)])
+async def upload_avatar(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """Sube un archivo .png para el avatar del widget y actualiza la configuración."""
+    if not file.filename.lower().endswith(".png"):
+        raise HTTPException(status_code=400, detail="Solo se permiten archivos PNG.")
+    
+    static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../static"))
+    os.makedirs(static_dir, exist_ok=True)
+    
+    filename = f"avatar-{int(time.time())}.png"
+    file_path = os.path.join(static_dir, filename)
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    cfg = await _get_config(db)
+    cfg.avatar_url = f"/static/{filename}"
+    await db.commit()
+    await db.refresh(cfg)
+    
+    return {"ok": True, "avatar_url": cfg.avatar_url}

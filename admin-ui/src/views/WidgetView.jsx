@@ -463,7 +463,42 @@ export default function WidgetView() {
                     ))}
                   </div>
                 </div>
-                <TextField label="URL del avatar (imagen del bot y botón flotante)" name="avatar_url" value={cfg.avatar_url} onChange={update} mono />
+                <div className="space-y-1">
+                  <label className="text-xs text-slate-400">URL del avatar (imagen del bot y botón flotante)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={cfg.avatar_url || ''}
+                      onChange={e => update('avatar_url', e.target.value)}
+                      className="flex-1 bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-[#168bf2] font-mono"
+                    />
+                    <label className="flex items-center gap-2 bg-[#4a4a4a] hover:bg-[#555] text-slate-200 font-medium text-sm px-4 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap">
+                      <input type="file" accept=".png" className="hidden" onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const fd = new FormData();
+                        fd.append('file', file);
+                        try {
+                          const res = await fetch(`${API_CONFIG.BASE_URL}/api/v1/widget/admin/avatar`, {
+                            method: 'POST',
+                            headers: { Authorization: API_CONFIG.getHeaders().Authorization },
+                            body: fd
+                          });
+                          const data = await res.json();
+                          if (res.ok) {
+                            update('avatar_url', data.avatar_url);
+                            // También recargar config si es necesario, pero update ya lo cambia localmente.
+                          }
+                          else alert(data.detail || 'Error al subir avatar');
+                        } catch(err) {
+                          alert('Error de conexión');
+                        }
+                        e.target.value = '';
+                      }} />
+                      Subir .png
+                    </label>
+                  </div>
+                </div>
               </div>
             </Section>
 
