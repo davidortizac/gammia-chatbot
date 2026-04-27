@@ -202,7 +202,7 @@ async def widget_chat(
         from google.genai import types
         from app.agents.tools.gamma_tools import search_tool
 
-        rag_context = search_tool(body.message, is_internal=ctx["is_internal"], top_k=4)
+        rag_context = search_tool(body.message, is_internal=ctx["is_internal"], top_k=15)
 
         if ctx["is_internal"]:
             system = (
@@ -225,7 +225,7 @@ async def widget_chat(
         prompt = (
             f"Contexto de la base de conocimiento:\n{rag_context}\n\n"
             f"Pregunta del usuario: {body.message}\n\n"
-            "Responde de forma útil y concisa basándote en el contexto proporcionado."
+            "Responde de forma útil y detallada basándote en el contexto proporcionado."
         )
 
         client = genai.Client(api_key=settings.GOOGLE_API_KEY)
@@ -235,7 +235,7 @@ async def widget_chat(
             config=types.GenerateContentConfig(
                 system_instruction=system,
                 temperature=0.1,
-                max_output_tokens=512,
+                max_output_tokens=4096,
             ),
         )
         reply = response.text

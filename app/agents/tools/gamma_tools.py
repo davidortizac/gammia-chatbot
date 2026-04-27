@@ -55,8 +55,8 @@ def _rrf_score(rank: int, k: int = 60) -> float:
 def _hybrid_search(
     query: str,
     is_internal: bool,
-    top_k: int = 5,
-    candidate_k: int = 20,
+    top_k: int = 15,
+    candidate_k: int = 60,
 ) -> List[Dict]:
     """
     Hybrid Search con RRF.
