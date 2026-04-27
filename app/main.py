@@ -11,125 +11,115 @@ from app.api.endpoints import chat, rag, analytics, widget, admin_auth
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        from sqlalchemy import text
-        await conn.execute(text('CREATE EXTENSION IF NOT EXISTS vector'))
-
-        # Patch 1: añadir columna tags si no existe
-        try:
-            await conn.execute(text("ALTER TABLE document_nodes ADD COLUMN IF NOT EXISTS tags VARCHAR[] DEFAULT ARRAY['general']::VARCHAR[]"))
-        except Exception:
-            pass
-
-        # Patch 2: actualizar dimensión del embedding de 768 a 3072 (gemini-embedding-001)
-        try:
-            await conn.execute(text("ALTER TABLE document_nodes ALTER COLUMN embedding TYPE vector(3072)"))
-        except Exception:
-            pass  # Ya tiene las dimensiones correctas o la tabla no existe aún
-
-        # Crear todas las tablas (incluyendo la nueva tabla 'tags')
-        await conn.run_sync(Base.metadata.create_all)
-
-        # ── Parches WidgetConfig (nuevas columnas) ────────────────────────────
-        widget_col_patches = [
-            ("secondary_color",   "VARCHAR DEFAULT '#064E3B'"),
-            ("background_color",  "VARCHAR DEFAULT '#0B1120'"),
-            ("surface_color",     "VARCHAR DEFAULT '#111827'"),
-            ("surface2_color",    "VARCHAR DEFAULT '#1E293B'"),
-            ("user_bubble_color", "VARCHAR DEFAULT '#10B981'"),
-            ("bot_bubble_color",  "VARCHAR DEFAULT '#1E293B'"),
-            ("text_color",        "VARCHAR DEFAULT '#E2E8F0'"),
-            ("border_color",      "VARCHAR DEFAULT '#1E293B'"),
-            ("subtitle",          "VARCHAR DEFAULT 'Asistente Virtual · Gamma Ingenieros'"),
-            ("bot_icon_type",     "VARCHAR DEFAULT 'avatar'"),
-            ("theme",             "VARCHAR DEFAULT 'dark'"),
-            ("max_interactions",  "INTEGER DEFAULT 10"),
-            ("chat_width",        "INTEGER DEFAULT 370"),
-            ("chat_height",       "INTEGER DEFAULT 560"),
-        ]
-        for col, type_def in widget_col_patches:
-            try:
-                await conn.execute(text(
-                    f"ALTER TABLE widget_config ADD COLUMN IF NOT EXISTS {col} {type_def}"
-                ))
-            except Exception:
-                pass
-
-        # ── Parches InteractionLog / WidgetSession ────────────────────────────
-        try:
-            await conn.execute(text(
-                "ALTER TABLE interaction_logs ADD COLUMN IF NOT EXISTS session_id VARCHAR"
-            ))
-            await conn.execute(text(
-                "CREATE INDEX IF NOT EXISTS idx_interaction_logs_session_id ON interaction_logs (session_id)"
-            ))
-        except Exception:
-            pass
-        try:
-            await conn.execute(text(
-                "ALTER TABLE widget_sessions ADD COLUMN IF NOT EXISTS last_interaction_at TIMESTAMPTZ"
-            ))
-        except Exception:
-            pass
-
-        # ── Sembrar configuración inicial del widget si no existe ─────────────
-        from app.db.models import WidgetConfig, AdminUser
-        from app.core.auth import hash_password
-        from sqlalchemy.ext.asyncio import AsyncSession
-        async with AsyncSession(engine) as session:
-            result = await session.execute(text("SELECT id FROM widget_config WHERE id=1"))
-            if not result.scalar():
-                session.add(WidgetConfig(id=1))
-                await session.commit()
-
-        # ── Sembrar admin por defecto si no existe ninguno ────────────────────
-        async with AsyncSession(engine) as session:
-            result = await session.execute(text("SELECT id FROM admin_users LIMIT 1"))
-            if not result.scalar():
-                default_admin = AdminUser(
-                    email=settings.ADMIN_DEFAULT_EMAIL,
-                    full_name="Administrador Principal",
-                    hashed_password=hash_password(settings.ADMIN_DEFAULT_PASSWORD),
-                    role="superadmin",
-                    created_by="system",
-                )
-                session.add(default_admin)
-                await session.commit()
-                print(f"[GammIA] Admin por defecto creado: {settings.ADMIN_DEFAULT_EMAIL}")
-
-        # Índice HNSW para búsqueda vectorial eficiente a escala
-        try:
-            await conn.execute(text("""
-                CREATE INDEX IF NOT EXISTS idx_document_nodes_embedding_hnsw
-                ON document_nodes
-                USING hnsw (embedding vector_cosine_ops)
-                WITH (m = 16, ef_construction = 64)
-            """))
-        except Exception as e:
-            print(f"Info HNSW index: {e}")
-
-        # Columna tsvector + índice GIN para búsqueda léxica (Hybrid Search)
-        try:
-            await conn.execute(text(
-                "ALTER TABLE document_nodes ADD COLUMN IF NOT EXISTS content_tsv tsvector"
-            ))
-        except Exception:
-            pass
-        try:
-            # Poblar tsvector en filas existentes
-            await conn.execute(text(
-                "UPDATE document_nodes SET content_tsv = to_tsvector('spanish', coalesce(content,'')) WHERE content_tsv IS NULL"
-            ))
-            # Índice GIN sobre el tsvector
-            await conn.execute(text(
-                "CREATE INDEX IF NOT EXISTS idx_document_nodes_content_gin ON document_nodes USING gin(content_tsv)"
-            ))
-        except Exception as e:
-            print(f"Info GIN index: {e}")
-
-
+    try:
+        await _init_db()
+    except Exception as e:
+        # El app arranca igual — las migraciones se reintentarán en el próximo deploy
+        print(f"[GammIA] WARN: startup DB init falló ({e}). El servicio continúa.")
     yield
     await engine.dispose()
+
+
+async def _init_db():
+    """Migraciones DDL, seed de datos iniciales. Corre en el lifespan de startup."""
+    from sqlalchemy import text
+    from app.db.models import WidgetConfig, AdminUser
+    from app.core.auth import hash_password
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    # Tx 1: extensión pgvector (debe existir antes de create_all)
+    async with engine.begin() as conn:
+        await conn.execute(text('CREATE EXTENSION IF NOT EXISTS vector'))
+
+    # Tx 2: crear todas las tablas (aislado para que nunca sea revertido por patches)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    # Tx 3: patches ALTER TABLE en document_nodes
+    for stmt in [
+        "ALTER TABLE document_nodes ADD COLUMN IF NOT EXISTS tags VARCHAR[] DEFAULT ARRAY['general']::VARCHAR[]",
+        "ALTER TABLE document_nodes ALTER COLUMN embedding TYPE vector(3072)",
+        "ALTER TABLE document_nodes ADD COLUMN IF NOT EXISTS content_tsv tsvector",
+    ]:
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(text(stmt))
+        except Exception:
+            pass
+
+    # Tx 4: patches ALTER TABLE en widget_config (una tx por columna para evitar rollback en cascada)
+    for col, type_def in [
+        ("secondary_color",   "VARCHAR DEFAULT '#0d5eab'"),
+        ("background_color",  "VARCHAR DEFAULT '#1a1a1a'"),
+        ("surface_color",     "VARCHAR DEFAULT '#2d2d2d'"),
+        ("surface2_color",    "VARCHAR DEFAULT '#3d3d3d'"),
+        ("user_bubble_color", "VARCHAR DEFAULT '#168bf2'"),
+        ("bot_bubble_color",  "VARCHAR DEFAULT '#3d3d3d'"),
+        ("text_color",        "VARCHAR DEFAULT '#E2E8F0'"),
+        ("border_color",      "VARCHAR DEFAULT '#1E293B'"),
+        ("subtitle",          "VARCHAR DEFAULT 'Asistente Virtual · Gamma Ingenieros'"),
+        ("bot_icon_type",     "VARCHAR DEFAULT 'avatar'"),
+        ("theme",             "VARCHAR DEFAULT 'dark'"),
+        ("max_interactions",  "INTEGER DEFAULT 10"),
+        ("chat_width",        "INTEGER DEFAULT 370"),
+        ("chat_height",       "INTEGER DEFAULT 560"),
+    ]:
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(text(f"ALTER TABLE widget_config ADD COLUMN IF NOT EXISTS {col} {type_def}"))
+        except Exception:
+            pass
+
+    # Tx 5: patches en interaction_logs y widget_sessions
+    for stmt in [
+        "ALTER TABLE interaction_logs ADD COLUMN IF NOT EXISTS session_id VARCHAR",
+        "CREATE INDEX IF NOT EXISTS idx_interaction_logs_session_id ON interaction_logs (session_id)",
+        "ALTER TABLE widget_sessions ADD COLUMN IF NOT EXISTS last_interaction_at TIMESTAMPTZ",
+    ]:
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(text(stmt))
+        except Exception:
+            pass
+
+    # Tx 6: HNSW index (puede fallar si vector(3072) > 2000 dims — no crítico)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_document_nodes_embedding_hnsw
+                ON document_nodes USING hnsw (embedding vector_cosine_ops)
+                WITH (m = 16, ef_construction = 64)
+            """))
+    except Exception as e:
+        print(f"Info HNSW index: {e}")
+
+    # Tx 7: GIN full-text index
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("UPDATE document_nodes SET content_tsv = to_tsvector('spanish', coalesce(content,'')) WHERE content_tsv IS NULL"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_document_nodes_content_gin ON document_nodes USING gin(content_tsv)"))
+    except Exception as e:
+        print(f"Info GIN index: {e}")
+
+    # Seed en sesión separada
+    async with AsyncSession(engine) as session:
+        result = await session.execute(text("SELECT id FROM widget_config WHERE id=1"))
+        if not result.scalar():
+            session.add(WidgetConfig(id=1))
+            await session.commit()
+
+    async with AsyncSession(engine) as session:
+        result = await session.execute(text("SELECT id FROM admin_users LIMIT 1"))
+        if not result.scalar():
+            session.add(AdminUser(
+                email=settings.ADMIN_DEFAULT_EMAIL,
+                full_name="Administrador Principal",
+                hashed_password=hash_password(settings.ADMIN_DEFAULT_PASSWORD),
+                role="superadmin",
+                created_by="system",
+            ))
+            await session.commit()
+            print(f"[GammIA] Admin por defecto creado: {settings.ADMIN_DEFAULT_EMAIL}")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { UserPlus, Trash2, Shield, ShieldCheck, RefreshCw, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { GlobalModal } from '../App';
+import { API_CONFIG } from '../config';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API = API_CONFIG.BASE_URL;
 
 function authHeaders(token) {
   return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
@@ -212,10 +213,12 @@ export default function AdminUsersView({ token, currentUser }) {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <GlobalModal onClose={() => setModal(null)}>
-        {modal === 'create' && <CreateUserModal token={token} onClose={() => setModal(null)} onCreated={fetchUsers} />}
-        {modal === 'password' && <ChangePasswordModal token={token} onClose={() => setModal(null)} />}
-      </GlobalModal>
+      {modal && (
+        <GlobalModal onClose={() => setModal(null)}>
+          {modal === 'create' && <CreateUserModal token={token} onClose={() => setModal(null)} onCreated={fetchUsers} />}
+          {modal === 'password' && <ChangePasswordModal token={token} onClose={() => setModal(null)} />}
+        </GlobalModal>
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">

@@ -1,15 +1,20 @@
-// Configuración centralizada para conectar React con el Orquestador GammIA en GCP
+// Configuración centralizada de API para el panel admin GammIA
+//
+// En producción Docker: VITE_API_URL="" (vacío) → las llamadas van a rutas
+// relativas (/api/...) y nginx hace proxy al backend configurado en BACKEND_URL.
+//
+// En desarrollo local (npm run dev): VITE_API_URL="" también funciona gracias
+// al proxy de Vite configurado en vite.config.js.
+
+const TOKEN_KEY = 'gammia_admin_token';
 
 export const API_CONFIG = {
-    // La URL de Cloud Run donde vive el motor de Inteligencia Artificial
-    BASE_URL: "https://gammia-api-1028680563477.us-central1.run.app",
-    
-    // Mock Token que engaña temporalmente al backend haciéndole creer 
-    // que la petición proviene de un usuario logueado en la intranet
-    MOCK_AUTH_TOKEN: "GAMMA_MOCK_ADMIN_TOKEN_999",
+    BASE_URL: import.meta.env.VITE_API_URL || "",
+
+    getToken: () => localStorage.getItem(TOKEN_KEY) || "",
 
     getHeaders: () => ({
         "Content-Type": "application/json",
-        "Authorization": `Bearer GAMMA_MOCK_ADMIN_TOKEN_999`
-    })
+        "Authorization": `Bearer ${localStorage.getItem(TOKEN_KEY) || ""}`,
+    }),
 };

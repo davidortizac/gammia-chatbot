@@ -48,6 +48,10 @@ services:
       dockerfile: Dockerfile
     container_name: gammia_admin
     restart: unless-stopped
+    environment:
+      # En docker-compose local el backend resuelve por nombre de servicio.
+      # Para apuntar a GCP usa: BACKEND_URL=https://api.gammaingenieros.com
+      BACKEND_URL: ${BACKEND_URL:-http://backend:8000}
     depends_on:
       - backend
     ports:

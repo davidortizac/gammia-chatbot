@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { LogIn, Eye, EyeOff, ShieldCheck } from 'lucide-react';
-
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { API_CONFIG } from '../config';
 
 export default function LoginView({ onLogin }) {
   const [email, setEmail]       = useState('');
@@ -15,7 +14,7 @@ export default function LoginView({ onLogin }) {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/v1/auth/login`, {
+      const res = await fetch(`${API_CONFIG.BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

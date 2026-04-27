@@ -1,0 +1,27 @@
+# Secrets — nunca van a la imagen
+.env
+.env.*
+service_account.json
+
+# Frontend — no hace parte del backend
+admin-ui/
+
+# Dev artifacts
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Git
+.git/
+.gitignore
+
+# Docs / scripts locales
+*.md
+scripts/
+
+# Docker compose (no necesario en imagen)
+docker-compose*.yml
