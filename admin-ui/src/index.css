@@ -1,8 +1,19 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
+@theme {
+  --font-sans: 'Poppins', sans-serif;
+  --color-brand-blue: #168bf2;
+  --color-brand-black: #2d2d2d;
+  --color-brand-teal: #5bd893;
+  --color-brand-green: #3dc156;
+}
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    background-color: #1a1a1a;
+    color: #e2e8f0;
+    font-family: 'Poppins', sans-serif;
+    @apply antialiased;
   }
 }

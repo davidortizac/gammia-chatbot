@@ -5,14 +5,14 @@ const ToolCard = ({ icon, name, description, activeByDefault, badge }) => {
   const [active, setActive] = useState(activeByDefault);
   
   return (
-    <div className={`border rounded-2xl p-6 transition-all duration-300 ${active ? 'bg-emerald-900/10 border-emerald-500/30 shadow-[inset_0_0_20px_rgba(16,185,129,0.05)]' : 'bg-slate-900/50 border-slate-800/80 saturate-0 opacity-70'}`}>
+    <div className={`border rounded-2xl p-6 transition-all duration-300 ${active ? 'bg-[#168bf2]/5 border-[#168bf2]/30 shadow-[inset_0_0_20px_rgba(22,139,242,0.05)]' : 'bg-[#2d2d2d]/50 border-[#3d3d3d]/80 saturate-0 opacity-70'}`}>
        <div className="flex justify-between items-start mb-4">
-          <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-2xl shadow-inner border border-slate-700 text-emerald-400">
+          <div className="w-12 h-12 rounded-xl bg-[#3d3d3d] flex items-center justify-center text-2xl shadow-inner border border-[#4a4a4a] text-[#5bd893]">
              {icon}
           </div>
-          <button 
+          <button
              onClick={() => setActive(!active)}
-             className={`w-12 h-6 rounded-full relative transition-colors duration-300 focus:outline-none ${active ? 'bg-emerald-500' : 'bg-slate-700'}`}
+             className={`w-12 h-6 rounded-full relative transition-colors duration-300 focus:outline-none ${active ? 'bg-[#168bf2]' : 'bg-[#4a4a4a]'}`}
           >
              <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform duration-300 shadow-md ${active ? 'translate-x-7' : 'translate-x-1'}`}></div>
           </button>
@@ -23,9 +23,9 @@ const ToolCard = ({ icon, name, description, activeByDefault, badge }) => {
        </div>
        <p className="text-sm text-slate-500 mt-2 leading-relaxed">{description}</p>
        
-       <div className="mt-6 pt-4 border-t border-slate-800/50 flex items-center justify-between">
+       <div className="mt-6 pt-4 border-t border-[#3d3d3d]/50 flex items-center justify-between">
          <span className="text-xs font-mono text-slate-600">v1.2.0</span>
-         <span className={`text-xs font-semibold px-2 py-0.5 rounded ${active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+         <span className={`text-xs font-semibold px-2 py-0.5 rounded ${active ? 'bg-[#168bf2]/10 text-[#5bd893]' : 'bg-[#3d3d3d] text-slate-500'}`}>
             {active ? 'RUNNING' : 'DISABLED'}
          </span>
        </div>

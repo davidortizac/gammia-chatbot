@@ -33,8 +33,8 @@ function TagChip({ tag, selected, onClick }) {
 function StatusBanner({ status, message }) {
   if (!status || status === 'suggest') return null;
   const cfg = {
-    loading: { icon: <Loader size={16} className="animate-spin text-emerald-400"/>, cls: 'bg-slate-800/60 border-slate-700' },
-    ok:      { icon: <CheckCircle size={16} className="text-emerald-400"/>, cls: 'bg-emerald-500/10 border-emerald-500/30' },
+    loading: { icon: <Loader size={16} className="animate-spin text-[#5bd893]"/>, cls: 'bg-[#3d3d3d]/60 border-[#4a4a4a]' },
+    ok:      { icon: <CheckCircle size={16} className="text-[#3dc156]"/>, cls: 'bg-[#3dc156]/10 border-[#3dc156]/30' },
     error:   { icon: <AlertCircle size={16} className="text-rose-400"/>, cls: 'bg-rose-500/10 border-rose-500/30' },
   };
   const { icon, cls } = cfg[status] || cfg.error;
@@ -278,7 +278,7 @@ export default function RagView() {
           ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
-                ${tab===t.id ? 'bg-emerald-500 text-slate-900 shadow-[0_0_12px_rgba(16,185,129,0.4)]' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
+                ${tab===t.id ? 'bg-[#168bf2] text-white shadow-[0_0_12px_rgba(22,139,242,0.4)]' : 'bg-[#3d3d3d] text-slate-400 hover:text-white'}`}>
               {t.label}
             </button>
           ))}
@@ -286,13 +286,13 @@ export default function RagView() {
       </div>
 
       {/* Tag Picker Bar */}
-      <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5">
+      <div className="bg-[#2d2d2d]/50 border border-[#3d3d3d] rounded-2xl p-5">
         <div className="flex justify-between items-center mb-3">
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
             Tags RBAC — {selectedTags.length} seleccionado{selectedTags.length !== 1 ? 's' : ''}
           </p>
           <button onClick={() => setShowNewTag(true)}
-            className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 transition-colors">
+            className="flex items-center gap-1 text-xs text-[#5bd893] hover:text-[#3dc156] transition-colors">
             <Plus size={12}/> Nuevo tag
           </button>
         </div>
@@ -315,17 +315,17 @@ export default function RagView() {
               if (f) uploadFile(f, true);
             }}
             className={`flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-2xl p-14 cursor-pointer transition-all
-              ${dragOver ? 'border-emerald-400 bg-emerald-500/10 scale-[1.01]' : 'border-slate-700 hover:border-slate-500 bg-slate-900/30 hover:bg-slate-900/50'}`}>
+              ${dragOver ? 'border-[#168bf2] bg-[#168bf2]/10 scale-[1.01]' : 'border-[#4a4a4a] hover:border-slate-500 bg-[#2d2d2d]/30 hover:bg-[#2d2d2d]/50'}`}>
             <input id="rag-file-input" type="file" accept={accepted} className="sr-only" onChange={handleFileChange}/>
-            <Upload size={36} className={`transition-colors ${dragOver ? 'text-emerald-400' : 'text-slate-500'}`}/>
+            <Upload size={36} className={`transition-colors ${dragOver ? 'text-[#168bf2]' : 'text-slate-500'}`}/>
             <div className="text-center">
-              <p className="text-slate-200 font-medium">Arrastra aquí o <span className="text-emerald-400 underline">haz clic para seleccionar</span></p>
+              <p className="text-slate-200 font-medium">Arrastra aquí o <span className="text-[#168bf2] underline">haz clic para seleccionar</span></p>
               <p className="text-slate-600 text-xs mt-1">PDF · Word · Excel · PowerPoint · TXT · Markdown — máx. 50 MB</p>
             </div>
           </label>
 
           {/* URL scraper */}
-          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5">
+          <div className="bg-[#2d2d2d]/50 border border-[#3d3d3d] rounded-2xl p-5">
             <div className="flex items-center gap-2 mb-3">
               <Globe size={15} className="text-slate-400"/>
               <p className="text-sm font-medium text-slate-300">O vectoriza desde una URL</p>
@@ -334,9 +334,9 @@ export default function RagView() {
               <input value={urlInput} onChange={e => setUrlInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && uploadUrl(true)}
                 placeholder="https://gammaingenieros.com/..."
-                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors"/>
+                className="flex-1 bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-[#168bf2] transition-colors"/>
               <button onClick={() => uploadUrl(true)} disabled={!urlInput || status==='loading'}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium text-sm rounded-lg transition-all disabled:opacity-40 flex items-center gap-2">
+                className="px-4 py-2 bg-[#4a4a4a] hover:bg-[#555] text-slate-200 font-medium text-sm rounded-lg transition-all disabled:opacity-40 flex items-center gap-2">
                 <Globe size={13}/> Scrapear
               </button>
             </div>
@@ -355,7 +355,7 @@ export default function RagView() {
               </div>
               <div className="flex gap-3 pt-1">
                 <button onClick={confirmUpload}
-                  className="flex items-center gap-2 px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold text-sm rounded-lg transition-all shadow-[0_0_12px_rgba(16,185,129,0.3)]">
+                  className="flex items-center gap-2 px-5 py-2 bg-[#168bf2] hover:bg-[#1a96f5] text-white font-semibold text-sm rounded-lg transition-all shadow-[0_0_12px_rgba(16,185,129,0.3)]">
                   <CheckCircle size={14}/> Confirmar y vectorizar
                 </button>
                 <button onClick={() => { setSuggestedTags(null); setPendingPayload(null); setStatus(null); }}
@@ -372,9 +372,9 @@ export default function RagView() {
 
       {/* ── DRIVE TAB ──────────────────────────────────────────────────── */}
       {tab === 'drive' && (
-        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 space-y-5">
+        <div className="bg-[#2d2d2d]/50 border border-[#3d3d3d] rounded-2xl p-6 space-y-5">
           <div className="flex items-center gap-2">
-            <HardDrive size={18} className="text-emerald-400"/>
+            <HardDrive size={18} className="text-[#5bd893]"/>
             <h3 className="text-white font-semibold">Sincronización Google Drive</h3>
           </div>
 
@@ -387,7 +387,7 @@ export default function RagView() {
             <label className="block text-xs font-medium text-slate-400 mb-1.5">Folder ID de Google Drive</label>
             <input value={driveFolder} onChange={e => setDriveFolder(e.target.value)}
               placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-emerald-500 transition-colors"/>
+              className="w-full bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-[#168bf2] transition-colors"/>
             <p className="text-xs text-slate-600 mt-1">
               drive.google.com/drive/folders/<strong>ID_AQUÍ</strong>
             </p>
@@ -401,7 +401,7 @@ export default function RagView() {
           </div>
 
           <button onClick={syncDrive} disabled={!driveFolder.trim() || status==='loading'}
-            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-900 font-semibold text-sm rounded-lg transition-all">
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#168bf2] hover:bg-[#1a96f5] disabled:opacity-40 text-white font-semibold text-sm rounded-lg transition-all">
             {status==='loading' ? <Loader size={14} className="animate-spin"/> : <HardDrive size={14}/>}
             {status==='loading' ? 'Sincronizando...' : 'Sincronizar ahora'}
           </button>
@@ -414,7 +414,7 @@ export default function RagView() {
               <div className="max-h-64 overflow-y-auto space-y-1 rounded-xl">
                 {driveResult.results.map((r, i) => (
                   <div key={i} className={`flex justify-between items-center px-3 py-2 rounded-lg text-xs
-                    ${r.status==='success' ? 'bg-emerald-500/10 text-emerald-300' : r.status==='error' ? 'bg-rose-500/10 text-rose-300' : 'bg-slate-800 text-slate-500'}`}>
+                    ${r.status==='success' ? 'bg-[#3dc156]/10 text-[#3dc156]' : r.status==='error' ? 'bg-rose-500/10 text-rose-300' : 'bg-[#3d3d3d] text-slate-500'}`}>
                     <span className="font-mono truncate">{r.file}</span>
                     <span className="ml-3 font-semibold shrink-0">
                       {r.status==='success' ? `✓ ${r.chunks_inserted} chunks` : r.reason || r.status}
@@ -429,16 +429,16 @@ export default function RagView() {
 
       {/* ── DOCS TAB ───────────────────────────────────────────────────── */}
       {tab === 'docs' && (
-        <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl overflow-hidden">
+        <div className="bg-[#2d2d2d]/50 border border-[#3d3d3d]/80 rounded-2xl overflow-hidden">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-slate-800/50 border-b border-slate-700">
+              <tr className="bg-[#3d3d3d]/50 border-b border-[#4a4a4a]">
                 {['Documento','Tags','Fuente','Estado','Acciones'].map(h => (
                   <th key={h} className="p-4 text-xs font-medium text-slate-400 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-[#3d3d3d]/60">
               {loadingDocs ? (
                 <tr><td colSpan="5" className="p-8 text-center text-slate-500">
                   <Loader size={18} className="animate-spin inline mr-2"/>Cargando...
@@ -448,7 +448,7 @@ export default function RagView() {
                   Sin documentos. Usa la pestaña "Subir" para comenzar.
                 </td></tr>
               ) : documents.map(doc => (
-                <tr key={doc.id} className="hover:bg-slate-800/20 transition-colors">
+                <tr key={doc.id} className="hover:bg-[#3d3d3d]/20 transition-colors">
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       <FileText size={18} className="text-slate-500 shrink-0" strokeWidth={1.5}/>
@@ -472,8 +472,8 @@ export default function RagView() {
                       <Loader size={14} className="animate-spin text-slate-400"/>
                     ) : (
                       <div className="flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"/>
-                        <span className="text-xs text-emerald-400 font-medium">Activo</span>
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#3dc156]"/>
+                        <span className="text-xs text-[#3dc156] font-medium">Activo</span>
                       </div>
                     )}
                   </td>
@@ -500,9 +500,9 @@ export default function RagView() {
               ))}
             </tbody>
           </table>
-          <div className="p-4 border-t border-slate-800 flex justify-between items-center text-xs text-slate-500">
+          <div className="p-4 border-t border-[#3d3d3d] flex justify-between items-center text-xs text-slate-500">
             <span>{documents.length} documentos únicos vectorizados</span>
-            <button onClick={fetchDocs} className="flex items-center gap-1 hover:text-emerald-400 transition-colors">
+            <button onClick={fetchDocs} className="flex items-center gap-1 hover:text-[#5bd893] transition-colors">
               <RotateCcw size={12}/> Actualizar
             </button>
           </div>
@@ -512,7 +512,7 @@ export default function RagView() {
       {/* ── MODAL NUEVO TAG ───────────────────────────────────────────────── */}
       <GlobalModal onClose={() => setShowNewTag(false)}>
         {showNewTag && (
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+          <div className="bg-[#2d2d2d] border border-[#4a4a4a] rounded-2xl p-6 w-full max-w-sm shadow-2xl">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-white font-semibold">Crear nuevo tag</h3>
               <button onClick={() => setShowNewTag(false)} className="text-slate-400 hover:text-white"><X size={18}/></button>
@@ -521,11 +521,11 @@ export default function RagView() {
               <input value={newTag.id}
                 onChange={e => setNewTag({...newTag, id: e.target.value.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')})}
                 placeholder="ID interno (ej: legal, rrhh)"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 font-mono"/>
+                className="w-full bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-[#168bf2] font-mono"/>
               <input value={newTag.label}
                 onChange={e => setNewTag({...newTag, label: e.target.value})}
                 placeholder="Etiqueta visual (ej: Legal)"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"/>
+                className="w-full bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-[#168bf2]"/>
               <div>
                 <p className="text-xs text-slate-400 mb-2">Color</p>
                 <div className="flex flex-wrap gap-2">
@@ -540,7 +540,7 @@ export default function RagView() {
                 </div>
               </div>
               <button onClick={createTag} disabled={!newTag.id || !newTag.label}
-                className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-900 font-semibold py-2.5 rounded-lg text-sm transition-all">
+                className="w-full flex items-center justify-center gap-2 bg-[#168bf2] hover:bg-[#1a96f5] disabled:opacity-40 text-white font-semibold py-2.5 rounded-lg text-sm transition-all">
                 <Plus size={14}/> Crear tag
               </button>
             </div>
@@ -551,7 +551,7 @@ export default function RagView() {
       {/* ── MODAL EDITAR TAGS ─────────────────────────────────────────────── */}
       <GlobalModal onClose={() => setEditDoc(null)}>
         {editDoc && (
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+          <div className="bg-[#2d2d2d] border border-[#4a4a4a] rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h3 className="text-white font-semibold">Editar tags</h3>
@@ -568,7 +568,7 @@ export default function RagView() {
             </div>
             <div className="flex gap-3">
               <button onClick={() => updateTags(editDoc.id, editDoc.tags)} disabled={editDoc.tags.length === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-900 font-semibold text-sm rounded-lg transition-all">
+                className="flex items-center gap-2 px-4 py-2 bg-[#168bf2] hover:bg-[#1a96f5] disabled:opacity-40 text-white font-semibold text-sm rounded-lg transition-all">
                 <CheckCircle size={13}/> Guardar tags
               </button>
               <button onClick={() => setEditDoc(null)} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">Cancelar</button>
@@ -604,7 +604,7 @@ export default function RagView() {
       {/* ── MODAL VER CHUNKS ─────────────────────────────────────────────── */}
       <GlobalModal onClose={() => setChunksDoc(null)}>
         {chunksDoc && (
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-2xl shadow-2xl max-h-[80vh] flex flex-col">
+          <div className="bg-[#2d2d2d] border border-[#4a4a4a] rounded-2xl p-6 w-full max-w-2xl shadow-2xl max-h-[80vh] flex flex-col">
             <div className="flex justify-between items-center mb-4 shrink-0">
               <div>
                 <h3 className="text-white font-semibold">Fragmentos vectorizados</h3>
@@ -614,11 +614,11 @@ export default function RagView() {
             </div>
             <div className="overflow-y-auto space-y-3 flex-1 pr-1">
               {chunksDoc.chunks?.map((c, i) => (
-                <div key={c.chunk_id} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+                <div key={c.chunk_id} className="bg-[#3d3d3d]/50 border border-[#4a4a4a] rounded-xl p-4">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-xs font-mono text-slate-500">Chunk #{i+1} · ID:{c.chunk_id} · v{c.version} · {c.content_length} chars</span>
                     <div className="flex gap-1">
-                      {c.tags?.map(t => <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">#{t}</span>)}
+                      {c.tags?.map(t => <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-[#4a4a4a] text-slate-400">#{t}</span>)}
                     </div>
                   </div>
                   <p className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap">{c.content_preview}</p>

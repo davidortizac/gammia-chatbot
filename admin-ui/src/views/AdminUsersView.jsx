@@ -10,7 +10,7 @@ function authHeaders(token) {
 
 const ROLE_BADGE = {
   superadmin: 'bg-purple-500/20 text-purple-300 border border-purple-500/30',
-  admin:      'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+  admin:      'bg-[#168bf2]/20 text-[#5bd893] border border-[#168bf2]/30',
 };
 
 // ── Create User Modal ──────────────────────────────────────────────────────────
@@ -47,7 +47,7 @@ function CreateUserModal({ token, onClose, onCreated }) {
         <select
           value={form.role}
           onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
-          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+          className="w-full bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#168bf2]"
         >
           <option value="admin">Admin</option>
           <option value="superadmin">Superadmin</option>
@@ -60,7 +60,7 @@ function CreateUserModal({ token, onClose, onCreated }) {
             onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
             required
             placeholder={placeholder}
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 pr-10 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+            className="w-full bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2.5 pr-10 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#168bf2]"
           />
           <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
             {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -73,16 +73,16 @@ function CreateUserModal({ token, onClose, onCreated }) {
           onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
           required={key === 'email'}
           placeholder={placeholder}
-          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+          className="w-full bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#168bf2]"
         />
       )}
     </div>
   );
 
   return (
-    <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+    <div className="bg-[#2d2d2d] border border-[#4a4a4a] rounded-2xl p-6 w-full max-w-md shadow-2xl">
       <h3 className="text-white font-semibold text-lg mb-5 flex items-center gap-2">
-        <UserPlus size={18} className="text-emerald-400" /> Nuevo Admin
+        <UserPlus size={18} className="text-[#5bd893]" /> Nuevo Admin
       </h3>
       <form onSubmit={submit} className="space-y-4">
         {field('Correo electrónico', 'email', 'email', 'usuario@gammaingenieros.com')}
@@ -91,10 +91,10 @@ function CreateUserModal({ token, onClose, onCreated }) {
         {field('Rol', 'role')}
         {error && <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>}
         <div className="flex gap-3 pt-1">
-          <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 text-sm transition-colors">
+          <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-[#4a4a4a] text-slate-400 hover:text-slate-200 text-sm transition-colors">
             Cancelar
           </button>
-          <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-colors disabled:opacity-60">
+          <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-lg bg-[#168bf2] hover:bg-[#1a96f5] text-white text-sm font-semibold transition-colors disabled:opacity-60">
             {saving ? 'Guardando...' : 'Crear Admin'}
           </button>
         </div>
@@ -131,13 +131,13 @@ function ChangePasswordModal({ token, onClose }) {
   }
 
   return (
-    <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+    <div className="bg-[#2d2d2d] border border-[#4a4a4a] rounded-2xl p-6 w-full max-w-md shadow-2xl">
       <h3 className="text-white font-semibold text-lg mb-5 flex items-center gap-2">
-        <KeyRound size={18} className="text-emerald-400" /> Cambiar Contraseña
+        <KeyRound size={18} className="text-[#5bd893]" /> Cambiar Contraseña
       </h3>
       {ok ? (
         <div className="text-center py-4">
-          <p className="text-emerald-400 font-semibold mb-4">Contraseña actualizada</p>
+          <p className="text-[#3dc156] font-semibold mb-4">Contraseña actualizada</p>
           <button onClick={onClose} className="px-6 py-2 bg-slate-700 rounded-lg text-slate-200 text-sm hover:bg-slate-600">Cerrar</button>
         </div>
       ) : (
@@ -152,18 +152,18 @@ function ChangePasswordModal({ token, onClose }) {
                 value={form[key]}
                 onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
                 required
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                className="w-full bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#168bf2]"
               />
             </div>
           ))}
           <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
-            <input type="checkbox" checked={show} onChange={e => setShow(e.target.checked)} className="accent-emerald-500" />
+            <input type="checkbox" checked={show} onChange={e => setShow(e.target.checked)} className="accent-[#168bf2]" />
             Mostrar contraseñas
           </label>
           {error && <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>}
           <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 text-sm">Cancelar</button>
-            <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-60">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-[#4a4a4a] text-slate-400 hover:text-slate-200 text-sm">Cancelar</button>
+            <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-lg bg-[#168bf2] hover:bg-[#1a96f5] text-white text-sm font-semibold disabled:opacity-60">
               {saving ? 'Guardando...' : 'Actualizar'}
             </button>
           </div>
@@ -224,14 +224,14 @@ export default function AdminUsersView({ token, currentUser }) {
           <p className="text-sm text-slate-400 mt-0.5">{users.length} usuario{users.length !== 1 ? 's' : ''} registrado{users.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setModal('password')} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-sm transition-colors">
+          <button onClick={() => setModal('password')} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#4a4a4a] text-slate-400 hover:text-slate-200 hover:border-slate-600 text-sm transition-colors">
             <KeyRound size={15} /> Mi Contraseña
           </button>
-          <button onClick={fetchUsers} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 text-sm transition-colors">
+          <button onClick={fetchUsers} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#4a4a4a] text-slate-400 hover:text-slate-200 text-sm transition-colors">
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
           </button>
           {isSuperadmin && (
-            <button onClick={() => setModal('create')} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors">
+            <button onClick={() => setModal('create')} className="flex items-center gap-2 px-4 py-2 bg-[#168bf2] hover:bg-[#1a96f5] text-white rounded-lg text-sm font-medium transition-colors">
               <UserPlus size={15} /> Nuevo Admin
             </button>
           )}
@@ -239,10 +239,10 @@ export default function AdminUsersView({ token, currentUser }) {
       </div>
 
       {/* Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+      <div className="bg-[#2d2d2d] border border-[#3d3d3d] rounded-xl overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-800 text-xs text-slate-500 uppercase tracking-wider">
+            <tr className="border-b border-[#3d3d3d] text-xs text-slate-500 uppercase tracking-wider">
               <th className="text-left px-5 py-3 font-medium">Usuario</th>
               <th className="text-left px-5 py-3 font-medium">Rol</th>
               <th className="text-left px-5 py-3 font-medium">Estado</th>
@@ -257,7 +257,7 @@ export default function AdminUsersView({ token, currentUser }) {
             ) : users.length === 0 ? (
               <tr><td colSpan={6} className="text-center text-slate-500 py-12">Sin usuarios</td></tr>
             ) : users.map(u => (
-              <tr key={u.id} className={`border-b border-slate-800/60 hover:bg-slate-800/30 transition-colors ${!u.is_active ? 'opacity-50' : ''}`}>
+              <tr key={u.id} className={`border-b border-[#3d3d3d]/60 hover:bg-[#3d3d3d]/30 transition-colors ${!u.is_active ? 'opacity-50' : ''}`}>
                 <td className="px-5 py-3.5">
                   <p className="text-slate-200 font-medium">{u.email}</p>
                   {u.full_name && <p className="text-slate-500 text-xs mt-0.5">{u.full_name}</p>}
@@ -268,7 +268,7 @@ export default function AdminUsersView({ token, currentUser }) {
                   </span>
                 </td>
                 <td className="px-5 py-3.5">
-                  <span className={`text-xs px-2 py-1 rounded-full ${u.is_active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-700 text-slate-500'}`}>
+                  <span className={`text-xs px-2 py-1 rounded-full ${u.is_active ? 'bg-[#3dc156]/10 text-[#3dc156]' : 'bg-[#4a4a4a] text-slate-500'}`}>
                     {u.is_active ? 'Activo' : 'Inactivo'}
                   </span>
                 </td>

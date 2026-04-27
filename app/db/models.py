@@ -73,18 +73,18 @@ class WidgetConfig(Base):
     id = Column(Integer, primary_key=True)
 
     # ── Colores ────────────────────────────────────────────────────────────────
-    primary_color    = Column(String, default="#10B981")
-    secondary_color  = Column(String, default="#064E3B")
-    background_color = Column(String, default="#0B1120")
-    surface_color    = Column(String, default="#111827")
-    surface2_color   = Column(String, default="#1E293B")
-    user_bubble_color = Column(String, default="#10B981")
-    bot_bubble_color  = Column(String, default="#1E293B")
+    primary_color    = Column(String, default="#168bf2")
+    secondary_color  = Column(String, default="#0d5eab")
+    background_color = Column(String, default="#1a1a1a")
+    surface_color    = Column(String, default="#2d2d2d")
+    surface2_color   = Column(String, default="#3d3d3d")
+    user_bubble_color = Column(String, default="#168bf2")
+    bot_bubble_color  = Column(String, default="#3d3d3d")
     text_color       = Column(String, default="#E2E8F0")
     border_color     = Column(String, default="#1E293B")
 
     # ── Tipografía ─────────────────────────────────────────────────────────────
-    font_family = Column(String, default="'Inter', sans-serif")
+    font_family = Column(String, default="'Poppins', sans-serif")
     font_size   = Column(String, default="13px")
 
     # ── Contenido ──────────────────────────────────────────────────────────────

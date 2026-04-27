@@ -19,16 +19,16 @@ const FONT_OPTIONS = [
 ];
 
 const DEFAULT_CONFIG = {
-  primary_color:     '#10B981',
-  secondary_color:   '#064E3B',
-  background_color:  '#0B1120',
-  surface_color:     '#111827',
-  surface2_color:    '#1E293B',
-  user_bubble_color: '#10B981',
-  bot_bubble_color:  '#1E293B',
+  primary_color:     '#168bf2',
+  secondary_color:   '#0d5eab',
+  background_color:  '#1a1a1a',
+  surface_color:     '#2d2d2d',
+  surface2_color:    '#3d3d3d',
+  user_bubble_color: '#168bf2',
+  bot_bubble_color:  '#3d3d3d',
   text_color:        '#E2E8F0',
-  border_color:      '#1E293B',
-  font_family:       "'Inter', sans-serif",
+  border_color:      '#3d3d3d',
+  font_family:       "'Poppins', sans-serif",
   font_size:         '13px',
   title:             'GammIA',
   subtitle:          'Asistente Virtual · Gamma Ingenieros',
@@ -45,18 +45,18 @@ const DEFAULT_CONFIG = {
 function Section({ title, icon: Icon, children, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+    <div className="bg-[#2d2d2d] border border-[#3d3d3d] rounded-xl overflow-hidden">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-800/40 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#3d3d3d]/40 transition-colors"
       >
         <div className="flex items-center gap-2 text-slate-200 font-semibold">
-          <Icon size={16} className="text-emerald-400" />
+          <Icon size={16} className="text-[#5bd893]" />
           {title}
         </div>
         {open ? <ChevronUp size={15} className="text-slate-500" /> : <ChevronDown size={15} className="text-slate-500" />}
       </button>
-      {open && <div className="px-5 pb-5 space-y-4 border-t border-slate-800">{children}</div>}
+      {open && <div className="px-5 pb-5 space-y-4 border-t border-[#3d3d3d]">{children}</div>}
     </div>
   );
 }
@@ -76,7 +76,7 @@ function ColorField({ label, name, value, onChange }) {
           type="text"
           value={value || ''}
           onChange={e => onChange(name, e.target.value)}
-          className="w-24 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-mono text-slate-300 focus:outline-none focus:border-emerald-500"
+          className="w-24 bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-2 py-1.5 text-xs font-mono text-slate-300 focus:outline-none focus:border-[#168bf2]"
         />
       </div>
     </div>
@@ -91,7 +91,7 @@ function TextField({ label, name, value, onChange, mono = false }) {
         type="text"
         value={value || ''}
         onChange={e => onChange(name, e.target.value)}
-        className={`w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 ${mono ? 'font-mono' : ''}`}
+        className={`w-full bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-[#168bf2] ${mono ? 'font-mono' : ''}`}
       />
     </div>
   );
@@ -105,7 +105,7 @@ function TextareaField({ label, name, value, onChange }) {
         value={value || ''}
         onChange={e => onChange(name, e.target.value)}
         rows={3}
-        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 resize-y"
+        className="w-full bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-[#168bf2] resize-y"
       />
     </div>
   );
@@ -122,7 +122,7 @@ function NumberField({ label, name, value, onChange, min, max, unit = '' }) {
           min={min}
           max={max}
           onChange={e => onChange(name, parseInt(e.target.value, 10) || value)}
-          className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 text-right"
+          className="w-20 bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-[#168bf2] text-right"
         />
         {unit && <span className="text-xs text-slate-500">{unit}</span>}
       </div>
@@ -226,15 +226,15 @@ function WidgetPreview({ cfg }) {
 function SessionModal({ session, onClose }) {
   if (!session) return null;
   return (
-    <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-      <div className="flex items-center justify-between p-5 border-b border-slate-800">
+    <div className="bg-[#2d2d2d] border border-[#4a4a4a] rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+      <div className="flex items-center justify-between p-5 border-b border-[#3d3d3d]">
         <div>
-          <h3 className="text-white font-semibold">Sesión: <span className="font-mono text-emerald-400">{session.id}</span></h3>
+          <h3 className="text-white font-semibold">Sesión: <span className="font-mono text-[#5bd893]">{session.id}</span></h3>
           <p className="text-xs text-slate-400 mt-0.5">
             Contexto: {session.context} · {session.interaction_count} interacciones
           </p>
         </div>
-        <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors">
+        <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-[#3d3d3d] transition-colors">
           <X size={18} />
         </button>
       </div>
@@ -242,12 +242,12 @@ function SessionModal({ session, onClose }) {
         {session.messages && session.messages.length > 0 ? session.messages.map((m, i) => (
           <div key={m.id || i} className="space-y-2">
             <div className="flex items-start justify-end gap-2">
-              <div className="bg-emerald-600/20 border border-emerald-600/30 rounded-xl rounded-br-sm px-3 py-2 text-sm text-slate-200 max-w-[80%]">
+              <div className="bg-[#168bf2]/20 border border-[#168bf2]/30 rounded-xl rounded-br-sm px-3 py-2 text-sm text-slate-200 max-w-[80%]">
                 {m.user_query}
               </div>
             </div>
             <div className="flex items-start gap-2">
-              <div className="bg-slate-800 border border-slate-700 rounded-xl rounded-bl-sm px-3 py-2 text-sm text-slate-300 max-w-[80%] whitespace-pre-wrap">
+              <div className="bg-[#3d3d3d] border border-[#4a4a4a] rounded-xl rounded-bl-sm px-3 py-2 text-sm text-slate-300 max-w-[80%] whitespace-pre-wrap">
                 {m.assistant_response}
               </div>
             </div>
@@ -346,7 +346,7 @@ export default function WidgetView() {
         <button
           onClick={save}
           disabled={saving || loading}
-          className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-semibold px-5 py-2.5 rounded-xl transition-colors"
+          className="flex items-center gap-2 bg-[#168bf2] hover:bg-[#1a96f5] disabled:opacity-50 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors"
         >
           {saving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
           {saving ? 'Guardando…' : 'Guardar cambios'}
@@ -355,14 +355,14 @@ export default function WidgetView() {
 
       {/* Status */}
       {status && (
-        <div className={`px-4 py-3 rounded-xl text-sm flex items-center justify-between ${status.type === 'ok' ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border border-red-500/30 text-red-300'}`}>
+        <div className={`px-4 py-3 rounded-xl text-sm flex items-center justify-between ${status.type === 'ok' ? 'bg-[#3dc156]/10 border border-[#3dc156]/30 text-[#3dc156]' : 'bg-red-500/10 border border-red-500/30 text-red-300'}`}>
           <span>{status.msg}</span>
           <button onClick={() => setStatus(null)} className="opacity-60 hover:opacity-100"><X size={14}/></button>
         </div>
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+      <div className="flex gap-1 bg-[#2d2d2d] p-1 rounded-xl border border-[#3d3d3d]">
         {tabs.map(t => (
           <button
             key={t.id}
@@ -414,7 +414,7 @@ export default function WidgetView() {
                   <select
                     value={cfg.font_family}
                     onChange={e => update('font_family', e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-[#168bf2]"
                   >
                     {FONT_OPTIONS.map(f => (
                       <option key={f.value} value={f.value}>{f.label}</option>
@@ -429,7 +429,7 @@ export default function WidgetView() {
                         type="range" min="11" max="18" step="1"
                         value={parseInt(cfg.font_size) || 13}
                         onChange={e => update('font_size', e.target.value + 'px')}
-                        className="flex-1 accent-emerald-500"
+                        className="flex-1 accent-[#168bf2]"
                       />
                       <span className="text-sm text-slate-200 font-mono w-10 text-right">{cfg.font_size}</span>
                     </div>
@@ -449,14 +449,14 @@ export default function WidgetView() {
                       { value: 'letter', label: 'Letra inicial' },
                       { value: 'custom', label: 'URL personalizada' },
                     ].map(opt => (
-                      <label key={opt.value} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${cfg.bot_icon_type === opt.value ? 'border-emerald-500 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 text-slate-400 hover:border-slate-600'}`}>
+                      <label key={opt.value} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${cfg.bot_icon_type === opt.value ? 'border-[#168bf2] bg-[#168bf2]/10 text-[#5bd893]' : 'border-[#4a4a4a] text-slate-400 hover:border-slate-600'}`}>
                         <input
                           type="radio"
                           name="bot_icon_type"
                           value={opt.value}
                           checked={cfg.bot_icon_type === opt.value}
                           onChange={e => update('bot_icon_type', e.target.value)}
-                          className="accent-emerald-500"
+                          className="accent-[#168bf2]"
                         />
                         <span className="text-sm">{opt.label}</span>
                       </label>
@@ -513,9 +513,9 @@ export default function WidgetView() {
               />
             </div>
           </Section>
-          <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 text-sm text-slate-400 space-y-1">
+          <div className="bg-[#3d3d3d]/40 border border-[#4a4a4a]/50 rounded-xl p-4 text-sm text-slate-400 space-y-1">
             <p className="font-semibold text-slate-300">Formato de respuestas</p>
-            <p>Las respuestas del bot se renderizan con <strong className="text-slate-200">Markdown</strong>: negritas (<code className="text-emerald-400">**texto**</code>), listas (<code className="text-emerald-400">- item</code>), encabezados (<code className="text-emerald-400">## Título</code>), código y más.</p>
+            <p>Las respuestas del bot se renderizan con <strong className="text-slate-200">Markdown</strong>: negritas (<code className="text-[#5bd893]">**texto**</code>), listas (<code className="text-[#5bd893]">- item</code>), encabezados (<code className="text-[#5bd893]">## Título</code>), código y más.</p>
             <p>El modelo Gemini ya está configurado para usar formato Markdown en sus respuestas.</p>
           </div>
         </div>
@@ -553,10 +553,10 @@ export default function WidgetView() {
           )}
 
           {!sessLoading && sessions.length > 0 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+            <div className="bg-[#2d2d2d] border border-[#3d3d3d] rounded-xl overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-800 text-left">
+                  <tr className="border-b border-[#3d3d3d] text-left">
                     <th className="px-4 py-3 text-slate-400 font-medium">Session ID</th>
                     <th className="px-4 py-3 text-slate-400 font-medium">Contexto</th>
                     <th className="px-4 py-3 text-slate-400 font-medium text-center">Msgs</th>
@@ -567,8 +567,8 @@ export default function WidgetView() {
                 </thead>
                 <tbody>
                   {sessions.map((s, i) => (
-                    <tr key={s.id} className={`border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors ${i % 2 === 0 ? '' : 'bg-slate-800/10'}`}>
-                      <td className="px-4 py-3 font-mono text-xs text-emerald-400">{s.id}</td>
+                    <tr key={s.id} className={`border-b border-[#3d3d3d]/50 hover:bg-[#3d3d3d]/30 transition-colors ${i % 2 === 0 ? '' : 'bg-[#3d3d3d]/10'}`}>
+                      <td className="px-4 py-3 font-mono text-xs text-[#5bd893]">{s.id}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.context === 'internal' || s.context === 'intranet' ? 'bg-violet-500/20 text-violet-300' : 'bg-blue-500/20 text-blue-300'}`}>
                           {s.context}
@@ -585,7 +585,7 @@ export default function WidgetView() {
                       <td className="px-4 py-3">
                         <button
                           onClick={() => setSelectedSess(s)}
-                          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-400 border border-slate-700 hover:border-emerald-600 px-2.5 py-1 rounded-lg transition-colors"
+                          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-[#5bd893] border border-[#4a4a4a] hover:border-[#168bf2] px-2.5 py-1 rounded-lg transition-colors"
                         >
                           <Eye size={12} /> Ver
                         </button>

@@ -34,9 +34,9 @@ export default function LoginView({ onLogin }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B1120] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center p-4">
       {/* Background glow */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-500/10 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#168bf2]/10 blur-[120px] rounded-full pointer-events-none" />
 
       <div className="relative w-full max-w-md">
         {/* Logo */}
@@ -46,14 +46,14 @@ export default function LoginView({ onLogin }) {
           </div>
           <div className="text-center">
             <h1 className="text-2xl font-bold text-white tracking-tight">GammIA Admin</h1>
-            <p className="text-emerald-400 text-xs uppercase tracking-widest font-semibold mt-1">Centro de Comando</p>
+            <p className="text-[#5bd893] text-xs uppercase tracking-widest font-semibold mt-1">Centro de Comando</p>
           </div>
         </div>
 
         {/* Card */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-8">
+        <div className="bg-[#2d2d2d] border border-[#3d3d3d] rounded-2xl shadow-2xl p-8">
           <div className="flex items-center gap-2 mb-6">
-            <ShieldCheck size={18} className="text-emerald-400" />
+            <ShieldCheck size={18} className="text-[#5bd893]" />
             <h2 className="text-slate-200 font-semibold">Acceso Seguro</h2>
           </div>
 
@@ -67,8 +67,8 @@ export default function LoginView({ onLogin }) {
                 required
                 autoFocus
                 placeholder="admin@gammaingenieros.com"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500
-                           focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition-colors"
+                className="w-full bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500
+                           focus:outline-none focus:border-[#168bf2] focus:ring-1 focus:ring-[#168bf2]/50 transition-colors"
               />
             </div>
 
@@ -81,8 +81,8 @@ export default function LoginView({ onLogin }) {
                   onChange={e => setPassword(e.target.value)}
                   required
                   placeholder="••••••••"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 pr-10 text-sm text-slate-200 placeholder-slate-500
-                             focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition-colors"
+                  className="w-full bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2.5 pr-10 text-sm text-slate-200 placeholder-slate-500
+                             focus:outline-none focus:border-[#168bf2] focus:ring-1 focus:ring-[#168bf2]/50 transition-colors"
                 />
                 <button
                   type="button"
@@ -103,7 +103,7 @@ export default function LoginView({ onLogin }) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60
+              className="w-full flex items-center justify-center gap-2 bg-[#168bf2] hover:bg-[#1a96f5] disabled:opacity-60
                          text-white font-semibold py-2.5 rounded-lg transition-colors text-sm mt-2"
             >
               {loading ? (

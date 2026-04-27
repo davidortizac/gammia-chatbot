@@ -1,9 +1,10 @@
 import csv
 import io
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, cast, Date
 
 from app.db.database import get_db
 from app.db.models import InteractionLog, DocumentNode
@@ -37,6 +38,27 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
         "total_tokens": total_tokens,
         "avg_latency_ms": avg_latency,
     }
+
+@router.get("/daily-interactions")
+async def get_daily_interactions(db: AsyncSession = Depends(get_db)):
+    """Retorna el conteo de interacciones de los últimos 7 días para la gráfica del Dashboard."""
+    DAY_NAMES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+    today = datetime.now(timezone.utc).date()
+    result = []
+    for offset in range(6, -1, -1):
+        day = today - timedelta(days=offset)
+        count_res = await db.execute(
+            select(func.count(InteractionLog.id)).where(
+                cast(InteractionLog.timestamp, Date) == day
+            )
+        )
+        result.append({
+            "day": DAY_NAMES[day.weekday()],
+            "date": str(day),
+            "count": count_res.scalar() or 0,
+        })
+    return result
+
 
 @router.get("/export")
 async def export_analytics(format: str = "csv", db: AsyncSession = Depends(get_db)):
