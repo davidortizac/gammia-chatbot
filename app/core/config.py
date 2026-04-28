@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 horas
 
+    # CORS — orígenes permitidos (separados por coma)
+    # Producción: https://tu-admin.gammaingenieros.com,https://gammaingenieros.com
+    # Local:      http://localhost:5173,http://localhost:3000
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+
     # Default admin account (seeded on first startup)
     ADMIN_DEFAULT_EMAIL: str = "admin@gammaingenieros.com"
     ADMIN_DEFAULT_PASSWORD: str = "Gamma2024!"

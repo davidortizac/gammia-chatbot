@@ -30,6 +30,10 @@ steps:
     secretEnv: ['DB_PASSWORD']
 
   # 5. Desplegar Nueva Versión a Google Cloud Run (Backend)
+  # Seguridad de ingress:
+  #   test → --allow-unauthenticated (widget público accesible, admin protegido por JWT)
+  #   prod → --no-allow-unauthenticated + Cloud Load Balancer con IAP delante del panel admin
+  #          El widget embeddable puede exponerse vía --ingress=all con Cloud Armor activado
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -42,15 +46,28 @@ steps:
       - 'us-central1'
       - '--platform'
       - 'managed'
-      - '--allow-unauthenticated' # Reemplazar en Prod por requerimientos de IAP
+      - '--allow-unauthenticated'
+      - '--ingress=all'
+      - '--set-env-vars=ALLOWED_ORIGINS=${_ALLOWED_ORIGINS}'
+      - '--update-secrets=JWT_SECRET_KEY=gammia-jwt-secret:latest,GOOGLE_API_KEY=gammia-google-api-key:latest,DATABASE_URL=gammia-db-url:latest,WIDGET_INTERNAL_SECRET=gammia-widget-secret:latest'
+      - '--service-account=gammia-sa@$PROJECT_ID.iam.gserviceaccount.com'
+      - '--cpu=1'
+      - '--memory=512Mi'
+      - '--concurrency=80'
+      - '--min-instances=0'
+      - '--max-instances=4'
 
-  # * Nota: En un futuro, si el Frontend React debe publicarse aquí, 
-  # *       añadiremos un paso extra para compilar `npm run build` y subir a Cloud Storage / Firebase Hosting.
+  # * El frontend React se sirve desde la red local de Gamma (apunta a la URL de Cloud Run por API).
+  # * Para producción: configurar Cloud Armor en el Load Balancer para rate-limiting y WAF.
 
 availableSecrets:
   secretManager:
   - versionName: projects/$PROJECT_ID/secrets/gammia-db-pass/versions/latest
     env: 'DB_PASSWORD'
+
+substitutions:
+  _ENV: 'test'
+  _ALLOWED_ORIGINS: 'http://localhost:5173,http://localhost:3000'
 
 # Configuración de timeouts y tags (buena práctica corporativa)
 timeout: '1200s'

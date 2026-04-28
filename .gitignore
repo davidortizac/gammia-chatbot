@@ -21,3 +21,15 @@ __pycache__/
 *.tfstate
 *.tfstate.backup
 .terraform.tfstate.lock.info
+
+# Credenciales y secretos — NUNCA subir al repositorio
+service_account*.json
+*_service_account.json
+credentials*.json
+*.pem
+*.key
+
+# Archivos de desarrollo local / scratch
+scratch/
+fix_*.py
+test_*.py
