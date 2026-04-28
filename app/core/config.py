@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     # Google Workspace OAuth
     GOOGLE_CLIENT_ID: Optional[str] = None
 
+    # MCP — Servidor de Certificaciones (red local Gamma)
+    # Vacío → modo stdio/subprocess (desarrollo local con VPN)
+    # URL   → modo SSE, el servidor corre en la red de Gamma (producción GCP)
+    # Ejemplo: http://10.128.0.5:8001/sse
+    MCP_CERTIFICATIONS_URL: str = ""
+
     # JWT Admin Auth
     JWT_SECRET_KEY: str = "changeme-super-secret-key-replace-in-production"
     JWT_ALGORITHM: str = "HS256"

@@ -20,10 +20,21 @@ async def chat(
     if not enforce_guardrails(query):
         raise HTTPException(status_code=400, detail="Query bloqueado por reglas de seguridad corporativas.")
 
+    # Obtener configuración de la DB para usar el modelo y parámetros seleccionados
+    from app.api.endpoints.widget import _get_config
+    cfg = await _get_config(db)
+
     start_time = time.time()
     
-    # Aquí llamamos a nuestro agente
-    response_text, metadata = await execute_gammia_agent(query, current_user.get("is_internal", False))
+    # Aquí llamamos a nuestro agente con la config dinámica
+    response_text, metadata = await execute_gammia_agent(
+        query, 
+        current_user.get("is_internal", False),
+        model_id=cfg.model_id,
+        temperature=cfg.llm_temperature,
+        top_p=cfg.llm_top_p,
+        top_k=cfg.llm_top_k
+    )
 
     latency = int((time.time() - start_time) * 1000)
 

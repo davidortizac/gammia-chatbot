@@ -40,6 +40,7 @@ const DEFAULT_CONFIG = {
   max_interactions:  10,
   chat_width:        370,
   chat_height:       560,
+  model_id:          'gemini-1.5-flash',
   llm_temperature:   0.1,
   llm_top_p:         0.95,
   llm_top_k:         40,
@@ -277,6 +278,7 @@ export default function WidgetView() {
   const [sessions, setSessions]     = useState([]);
   const [sessLoading, setSessLoading] = useState(false);
   const [selectedSess, setSelectedSess] = useState(null);
+  const [availableModels, setAvailableModels] = useState([]);
 
   // ── Load config ──────────────────────────────────────────────────────────
   const loadConfig = useCallback(async () => {
@@ -293,6 +295,34 @@ export default function WidgetView() {
   }, []);
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
+
+  // ── Load available models ────────────────────────────────────────────────
+  const loadModels = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_CONFIG.BASE_URL}/api/v1/widget/admin/models`, { 
+        headers: API_CONFIG.getHeaders() 
+      });
+      if (!res.ok) throw new Error('API Error');
+      const data = await res.json();
+      if (data.models && data.models.length > 0) {
+        setAvailableModels(data.models);
+      } else {
+        throw new Error('Empty models list');
+      }
+    } catch (err) {
+      console.error('Error loading models, using fallbacks:', err);
+      setAvailableModels([
+        { id: 'gemini-1.5-flash', display_name: 'Gemini 1.5 Flash' },
+        { id: 'gemini-1.5-pro',   display_name: 'Gemini 1.5 Pro' },
+        { id: 'gemini-2.0-flash', display_name: 'Gemini 2.0 Flash' },
+        { id: 'gemini-2.0-pro-exp-02-05', display_name: 'Gemini 2.0 Pro Exp' },
+      ]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadModels();
+  }, [loadModels]);
 
   // ── Load sessions ────────────────────────────────────────────────────────
   const loadSessions = useCallback(async () => {
@@ -521,6 +551,23 @@ export default function WidgetView() {
                 <div className="bg-[#3d3d3d]/40 border border-[#4a4a4a]/50 rounded-xl p-3 text-xs text-slate-400 mb-2">
                   Ajusta cómo piensa y responde la IA. Cambios aplican de inmediato.
                 </div>
+                
+                <div className="space-y-1">
+                  <label className="text-xs text-slate-400">Modelo de IA (Gemini)</label>
+                  <select
+                    value={cfg.model_id}
+                    onChange={e => update('model_id', e.target.value)}
+                    className="w-full bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-[#168bf2]"
+                  >
+                    {availableModels.map(m => (
+                      <option key={m.id} value={m.id}>{m.display_name}</option>
+                    ))}
+                    {availableModels.length === 0 && (
+                       <option value={cfg.model_id}>{cfg.model_id} (Cargando...)</option>
+                    )}
+                  </select>
+                </div>
+
                 <div className="space-y-1">
                   <div className="flex justify-between"><label className="text-xs text-slate-400">Temperatura (Creatividad)</label><span className="text-xs font-mono">{cfg.llm_temperature}</span></div>
                   <input type="range" min="0" max="2" step="0.1" value={cfg.llm_temperature ?? 0.1} onChange={e => update('llm_temperature', parseFloat(e.target.value))} className="w-full accent-[#168bf2]" />

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, Upload, Tag, CheckCircle, AlertCircle, Loader, RotateCcw, Globe, HardDrive, Plus, X, Sparkles, Trash2, Pencil, RefreshCw, Eye, ArchiveRestore } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { FileText, Upload, Tag, CheckCircle, AlertCircle, Loader, RotateCcw, Globe, HardDrive, Plus, X, Sparkles, Trash2, Pencil, Eye, ArchiveRestore, FolderOpen, File } from 'lucide-react';
 import { API_CONFIG } from '../config';
 import { GlobalModal } from '../App';
 
@@ -57,7 +57,9 @@ export default function RagView() {
   const [dragOver, setDragOver]     = useState(false);
   const [suggestedTags, setSuggestedTags] = useState(null);
   const [pendingPayload, setPendingPayload] = useState(null);
+  const [driveMode,   setDriveMode]   = useState('folder'); // 'folder' | 'file'
   const [driveFolder, setDriveFolder] = useState('');
+  const [driveFileId, setDriveFileId] = useState('');
   const [driveResult, setDriveResult] = useState(null);
   const [showNewTag, setShowNewTag] = useState(false);
   const [newTag, setNewTag]         = useState({ id:'', label:'', color:'emerald' });
@@ -245,6 +247,28 @@ export default function RagView() {
     } catch (e) { setStatus('error'); setMessage(`Sin conexión: ${e.message}`); }
   };
 
+  // ── Drive Sync — archivo individual ─────────────────────────────────────
+  const syncDriveFile = async () => {
+    if (!driveFileId.trim()) return;
+    setStatus('loading'); setMessage('Conectando con Google Drive...');
+    try {
+      const r = await fetch(`${base}/api/v1/rag/sync-drive-file`, {
+        method: 'POST',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_id: driveFileId.trim(), tags: selectedTags }),
+      });
+      const d = await r.json();
+      if (!r.ok) {
+        setStatus('error');
+        setMessage(d.detail || 'Error al sincronizar. Verifica que el Service Account tenga acceso al archivo.');
+        return;
+      }
+      setStatus('ok');
+      setMessage(`✓ "${d.file_name}" vectorizado — ${d.chunks_inserted ?? 0} fragmentos creados.`);
+      fetchDocs();
+    } catch (e) { setStatus('error'); setMessage(`Sin conexión: ${e.message}`); }
+  };
+
   // ── Create Tag ───────────────────────────────────────────────────────────
   const createTag = async () => {
     if (!newTag.id || !newTag.label) return;
@@ -373,57 +397,101 @@ export default function RagView() {
       {/* ── DRIVE TAB ──────────────────────────────────────────────────── */}
       {tab === 'drive' && (
         <div className="bg-[#2d2d2d]/50 border border-[#3d3d3d] rounded-2xl p-6 space-y-5">
-          <div className="flex items-center gap-2">
-            <HardDrive size={18} className="text-[#5bd893]"/>
-            <h3 className="text-white font-semibold">Sincronización Google Drive</h3>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <HardDrive size={18} className="text-[#5bd893]"/>
+              <h3 className="text-white font-semibold">Sincronización Google Drive</h3>
+            </div>
+            {/* Sub-tabs carpeta / archivo */}
+            <div className="flex gap-1 bg-[#3d3d3d] rounded-lg p-1">
+              {[
+                { id: 'folder', label: 'Carpeta', Icon: FolderOpen },
+                { id: 'file',   label: 'Archivo',  Icon: File },
+              ].map(({ id, label, Icon }) => (
+                <button key={id} onClick={() => { setDriveMode(id); setStatus(null); setDriveResult(null); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all
+                    ${driveMode === id ? 'bg-[#168bf2] text-white shadow' : 'text-slate-400 hover:text-white'}`}>
+                  <Icon size={12}/>{label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-xs text-amber-300 leading-relaxed">
-            <strong>Requisito previo:</strong> Comparte la carpeta de Drive con el Service Account de GammIA.<br/>
-            El backend descargará y vectorizará los archivos nuevos omitiendo los ya procesados.
+            <strong>Requisito previo:</strong> Comparte {driveMode === 'folder' ? 'la carpeta' : 'el archivo'} de Drive
+            con el Service Account de GammIA.<br/>
+            El backend descargará y vectorizará {driveMode === 'folder' ? 'los archivos nuevos omitiendo los ya procesados' : 'el documento'}.
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">Folder ID de Google Drive</label>
-            <input value={driveFolder} onChange={e => setDriveFolder(e.target.value)}
-              placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
-              className="w-full bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-[#168bf2] transition-colors"/>
-            <p className="text-xs text-slate-600 mt-1">
-              drive.google.com/drive/folders/<strong>ID_AQUÍ</strong>
-            </p>
-          </div>
+          {/* ── Modo carpeta ── */}
+          {driveMode === 'folder' && (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Folder ID de Google Drive</label>
+                <input value={driveFolder} onChange={e => setDriveFolder(e.target.value)}
+                  placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+                  className="w-full bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-[#168bf2] transition-colors"/>
+                <p className="text-xs text-slate-600 mt-1">
+                  drive.google.com/drive/folders/<strong>ID_AQUÍ</strong>
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 mb-2">Tags para todos los archivos de esta carpeta:</p>
+                <div className="flex flex-wrap gap-2">
+                  {tags.map(t => <TagChip key={t.id} tag={t} selected={selectedTags.includes(t.id)} onClick={toggleTag}/>)}
+                </div>
+              </div>
+              <button onClick={syncDrive} disabled={!driveFolder.trim() || status==='loading'}
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#168bf2] hover:bg-[#1a96f5] disabled:opacity-40 text-white font-semibold text-sm rounded-lg transition-all">
+                {status==='loading' ? <Loader size={14} className="animate-spin"/> : <HardDrive size={14}/>}
+                {status==='loading' ? 'Sincronizando carpeta...' : 'Sincronizar carpeta'}
+              </button>
+              {driveResult?.results?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Detalle por archivo</p>
+                  <div className="max-h-64 overflow-y-auto space-y-1 rounded-xl">
+                    {driveResult.results.map((r, i) => (
+                      <div key={i} className={`flex justify-between items-center px-3 py-2 rounded-lg text-xs
+                        ${r.status==='success' ? 'bg-[#3dc156]/10 text-[#3dc156]' : r.status==='error' ? 'bg-rose-500/10 text-rose-300' : 'bg-[#3d3d3d] text-slate-500'}`}>
+                        <span className="font-mono truncate">{r.file}</span>
+                        <span className="ml-3 font-semibold shrink-0">
+                          {r.status==='success' ? `✓ ${r.chunks_inserted} chunks` : r.reason || r.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
 
-          <div>
-            <p className="text-xs text-slate-500 mb-2">Tags para todos los archivos de esta carpeta:</p>
-            <div className="flex flex-wrap gap-2">
-              {tags.map(t => <TagChip key={t.id} tag={t} selected={selectedTags.includes(t.id)} onClick={toggleTag}/>)}
-            </div>
-          </div>
-
-          <button onClick={syncDrive} disabled={!driveFolder.trim() || status==='loading'}
-            className="flex items-center gap-2 px-5 py-2.5 bg-[#168bf2] hover:bg-[#1a96f5] disabled:opacity-40 text-white font-semibold text-sm rounded-lg transition-all">
-            {status==='loading' ? <Loader size={14} className="animate-spin"/> : <HardDrive size={14}/>}
-            {status==='loading' ? 'Sincronizando...' : 'Sincronizar ahora'}
-          </button>
+          {/* ── Modo archivo individual ── */}
+          {driveMode === 'file' && (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">File ID de Google Drive</label>
+                <input value={driveFileId} onChange={e => setDriveFileId(e.target.value)}
+                  placeholder="1A2B3C4D5E6F7G8H9I0J…"
+                  className="w-full bg-[#3d3d3d] border border-[#4a4a4a] rounded-lg px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-[#168bf2] transition-colors"/>
+                <p className="text-xs text-slate-600 mt-1">
+                  drive.google.com/file/d/<strong>ID_AQUÍ</strong>/view — soporta PDF, DOCX, XLSX, PPTX, TXT, MD
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 mb-2">Tags para este archivo:</p>
+                <div className="flex flex-wrap gap-2">
+                  {tags.map(t => <TagChip key={t.id} tag={t} selected={selectedTags.includes(t.id)} onClick={toggleTag}/>)}
+                </div>
+              </div>
+              <button onClick={syncDriveFile} disabled={!driveFileId.trim() || status==='loading'}
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#168bf2] hover:bg-[#1a96f5] disabled:opacity-40 text-white font-semibold text-sm rounded-lg transition-all">
+                {status==='loading' ? <Loader size={14} className="animate-spin"/> : <File size={14}/>}
+                {status==='loading' ? 'Importando archivo...' : 'Importar archivo'}
+              </button>
+            </>
+          )}
 
           <StatusBanner status={status} message={message}/>
-
-          {driveResult?.results?.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Detalle</p>
-              <div className="max-h-64 overflow-y-auto space-y-1 rounded-xl">
-                {driveResult.results.map((r, i) => (
-                  <div key={i} className={`flex justify-between items-center px-3 py-2 rounded-lg text-xs
-                    ${r.status==='success' ? 'bg-[#3dc156]/10 text-[#3dc156]' : r.status==='error' ? 'bg-rose-500/10 text-rose-300' : 'bg-[#3d3d3d] text-slate-500'}`}>
-                    <span className="font-mono truncate">{r.file}</span>
-                    <span className="ml-3 font-semibold shrink-0">
-                      {r.status==='success' ? `✓ ${r.chunks_inserted} chunks` : r.reason || r.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 

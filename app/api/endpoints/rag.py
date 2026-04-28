@@ -339,6 +339,102 @@ async def sync_drive_folder(body: DriveSyncRequest, db: AsyncSession = Depends(g
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Google Drive — Sync de archivo individual
+# ─────────────────────────────────────────────────────────────────────────────
+
+class DriveFileSyncRequest(BaseModel):
+    file_id: str
+    tags: List[str] = ["internal"]
+    requested_by: str = "admin"
+
+
+@router.post("/sync-drive-file")
+async def sync_drive_file(body: DriveFileSyncRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Sincroniza un archivo individual de Google Drive dado su File ID.
+    Usa Service Account — el archivo debe compartirse con la cuenta de servicio.
+    """
+    try:
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+        from googleapiclient.http import MediaIoBaseDownload
+        import io as _io
+
+        sa_file = settings.GOOGLE_SERVICE_ACCOUNT_FILE
+        creds = service_account.Credentials.from_service_account_file(
+            sa_file, scopes=["https://www.googleapis.com/auth/drive.readonly"]
+        )
+        drive_service = build("drive", "v3", credentials=creds)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al conectar con Google Drive: {e}")
+
+    supported_mimes = {
+        "application/pdf": "pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+        "text/plain": "txt",
+        "text/markdown": "md",
+    }
+
+    # Obtener metadatos del archivo
+    try:
+        file_meta = drive_service.files().get(
+            fileId=body.file_id,
+            fields="id, name, mimeType, md5Checksum"
+        ).execute()
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Archivo no encontrado en Drive: {e}")
+
+    mime = file_meta.get("mimeType", "")
+    ext = supported_mimes.get(mime)
+    fname = file_meta.get("name", "unknown")
+    fid = file_meta["id"]
+
+    if not ext:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Tipo de archivo no soportado: {mime}. Soportados: PDF, DOCX, XLSX, PPTX, TXT, MD"
+        )
+
+    # Descargar archivo
+    try:
+        from googleapiclient.http import MediaIoBaseDownload
+        import io as _io
+        request = drive_service.files().get_media(fileId=fid)
+        buf = _io.BytesIO()
+        downloader = MediaIoBaseDownload(buf, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+        file_bytes = buf.getvalue()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error descargando archivo: {e}")
+
+    # Extraer texto
+    text = extract_text_from_file(file_bytes, fname)
+    if not text:
+        raise HTTPException(status_code=422, detail="No se pudo extraer texto del archivo")
+
+    # Vectorizar
+    pipeline = GammiaRAGPipeline(db)
+    result = await pipeline.ingest_drive_document(
+        doc_id=f"drive_{fid}",
+        title=fname,
+        full_content=text,
+        requested_by=body.requested_by,
+        tags=body.tags
+    )
+
+    return {
+        "file_id": fid,
+        "file_name": fname,
+        "mime_type": mime,
+        **result
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Listado de Nodos RAG
 # ─────────────────────────────────────────────────────────────────────────────
 

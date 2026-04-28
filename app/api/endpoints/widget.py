@@ -79,6 +79,11 @@ def _config_to_dict(cfg: WidgetConfig) -> dict:
         "max_interactions": cfg.max_interactions,
         "chat_width":       cfg.chat_width,
         "chat_height":      cfg.chat_height,
+        "model_id":         cfg.model_id,
+        "llm_temperature":  cfg.llm_temperature,
+        "llm_top_p":        cfg.llm_top_p,
+        "llm_top_k":        cfg.llm_top_k,
+        "rag_top_k":        cfg.rag_top_k,
     }
 
 
@@ -125,6 +130,11 @@ class WidgetConfigUpdate(BaseModel):
     max_interactions: Optional[int] = None
     chat_width:       Optional[int] = None
     chat_height:      Optional[int] = None
+    model_id:         Optional[str] = None
+    llm_temperature:  Optional[float] = None
+    llm_top_p:        Optional[float] = None
+    llm_top_k:        Optional[int] = None
+    rag_top_k:        Optional[int] = None
 
 
 # ── Endpoints públicos ─────────────────────────────────────────────────────────
@@ -230,7 +240,7 @@ async def widget_chat(
 
         client = genai.Client(api_key=settings.GOOGLE_API_KEY)
         response = client.models.generate_content(
-            model=settings.MODEL_ID,
+            model=cfg.model_id or settings.MODEL_ID,
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system,
@@ -367,3 +377,48 @@ async def upload_avatar(
     await db.refresh(cfg)
     
     return {"ok": True, "avatar_url": cfg.avatar_url}
+
+
+@router.get("/admin/models", dependencies=[Depends(get_current_admin)])
+async def list_available_models():
+    """Lista los modelos disponibles en la API de Gemini."""
+    try:
+        from google import genai
+        client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+        
+        # Listar modelos que soportan generación de contenido
+        models = []
+        # El iterador puede ser lento si hay muchos modelos, limitamos o procesamos rápido
+        for i, m in enumerate(client.models.list()):
+            if i > 100: break # Seguridad: no procesar más de 100 modelos
+            
+            # Filtrar para mostrar solo modelos de chat/generación relevantes
+            if m.supported_generation_methods and "generateContent" in m.supported_generation_methods:
+                name = m.name.replace("models/", "")
+                # Solo modelos gemini y evitar embeddings/vision pura si no es necesario
+                if "gemini" in name.lower() and "embedding" not in name.lower():
+                    models.append({
+                        "id": name,
+                        "display_name": m.display_name or name,
+                        "description": m.description
+                    })
+        
+        # Ordenar: modelos más recientes primero (2.5 > 2.0 > 1.5)
+        models.sort(key=lambda x: x["id"], reverse=True)
+
+        return {"models": models}
+    except Exception as e:
+        print(f"Error listing models: {e}")
+        # Fallback con modelos actuales de Google AI Studio (Gemini API)
+        return {
+            "models": [
+                {"id": "gemini-2.5-pro-preview-05-06",    "display_name": "Gemini 2.5 Pro Preview (más potente)"},
+                {"id": "gemini-2.5-flash-preview-04-17",  "display_name": "Gemini 2.5 Flash Preview (rápido + inteligente)"},
+                {"id": "gemini-2.0-flash",                "display_name": "Gemini 2.0 Flash"},
+                {"id": "gemini-2.0-flash-lite",           "display_name": "Gemini 2.0 Flash Lite (más rápido)"},
+                {"id": "gemini-1.5-pro",                  "display_name": "Gemini 1.5 Pro"},
+                {"id": "gemini-1.5-flash",                "display_name": "Gemini 1.5 Flash"},
+                {"id": "gemini-1.5-flash-8b",             "display_name": "Gemini 1.5 Flash 8B (ultra rápido)"},
+            ],
+            "error": str(e)
+        }

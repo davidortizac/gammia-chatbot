@@ -104,6 +104,7 @@ class WidgetConfig(Base):
     chat_height      = Column(Integer, default=560)
     
     # ── LLM & RAG Config ───────────────────────────────────────────────────────
+    model_id         = Column(String, default="gemini-2.0-flash")
     llm_temperature  = Column(Float, default=0.1)
     llm_top_p        = Column(Float, default=0.95)
     llm_top_k        = Column(Integer, default=40)
@@ -133,3 +134,13 @@ class WidgetSession(Base):
     interaction_count    = Column(Integer, default=0)
     created_at           = Column(DateTime(timezone=True), server_default=func.now())
     last_interaction_at  = Column(DateTime(timezone=True), nullable=True)
+
+
+class IntegrationConfig(Base):
+    """Configuración de integraciones del agente GammIA gestionable desde el panel admin."""
+    __tablename__ = "integration_configs"
+
+    id          = Column(String, primary_key=True)  # rag, google_workspace, salesforce, vulnerability_scanner
+    enabled     = Column(Boolean, default=False)
+    config_json = Column(Text, nullable=True)        # JSON con API keys, endpoints, etc.
+    updated_at  = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

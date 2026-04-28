@@ -7,16 +7,30 @@ import os
 
 from app.core.config import settings
 from app.db.database import engine, Base
-from app.api.endpoints import chat, rag, analytics, widget, admin_auth
+from app.api.endpoints import chat, rag, analytics, widget, admin_auth, integrations
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Conectar al servidor MCP de certificaciones (solo para usuarios internos)
+    from app.agents.mcp_client import mcp_manager
+    if settings.MCP_CERTIFICATIONS_URL:
+        # Producción GCP: el servidor MCP corre en la red local de Gamma vía SSE
+        await mcp_manager.connect(sse_url=settings.MCP_CERTIFICATIONS_URL)
+    else:
+        # Desarrollo local: arranca el servidor como subprocess (requiere VPN)
+        mcp_script = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "mcp_servers", "certifications_mcp.py")
+        )
+        await mcp_manager.connect(stdio_script=mcp_script)
+
     try:
         await _init_db()
     except Exception as e:
-        # El app arranca igual — las migraciones se reintentarán en el próximo deploy
         print(f"[GammIA] WARN: startup DB init falló ({e}). El servicio continúa.")
+
     yield
+
+    await mcp_manager.disconnect()
     await engine.dispose()
 
 
@@ -63,6 +77,7 @@ async def _init_db():
         ("max_interactions",  "INTEGER DEFAULT 10"),
         ("chat_width",        "INTEGER DEFAULT 370"),
         ("chat_height",       "INTEGER DEFAULT 560"),
+        ("model_id",          "VARCHAR DEFAULT 'gemini-1.5-flash'"),
         ("llm_temperature",   "FLOAT DEFAULT 0.1"),
         ("llm_top_p",         "FLOAT DEFAULT 0.95"),
         ("llm_top_k",         "INTEGER DEFAULT 40"),
@@ -79,6 +94,8 @@ async def _init_db():
         "ALTER TABLE interaction_logs ADD COLUMN IF NOT EXISTS session_id VARCHAR",
         "CREATE INDEX IF NOT EXISTS idx_interaction_logs_session_id ON interaction_logs (session_id)",
         "ALTER TABLE widget_sessions ADD COLUMN IF NOT EXISTS last_interaction_at TIMESTAMPTZ",
+        # Tabla de integraciones (creada por create_all, este patch es por si existe sin la columna)
+        "CREATE TABLE IF NOT EXISTS integration_configs (id VARCHAR PRIMARY KEY, enabled BOOLEAN DEFAULT FALSE, config_json TEXT, updated_at TIMESTAMPTZ DEFAULT now())",
     ]:
         try:
             async with engine.begin() as conn:
@@ -148,6 +165,7 @@ app.include_router(chat.router, prefix="/api/v1", tags=["Chat & Orchestration"])
 app.include_router(rag.router, prefix="/api/v1/rag", tags=["Vector RAG Sync"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Commercial Analytics"])
 app.include_router(widget.router, prefix="/api/v1/widget", tags=["Chatbot Widget"])
+app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["Integrations"])
 
 # Servir archivos estáticos (widget JS, demo page)
 static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
