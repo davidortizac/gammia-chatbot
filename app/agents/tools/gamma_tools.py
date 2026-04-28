@@ -57,22 +57,29 @@ def _hybrid_search(
     is_internal: bool,
     top_k: int = 15,
     candidate_k: int = 60,
+    tags: List[str] | None = None,
 ) -> List[Dict]:
     """
     Hybrid Search con RRF.
-    
+
     Parámetros:
         query       : pregunta del usuario
         is_internal : True = acceso total, False = solo tags 'public'
         top_k       : número final de chunks a retornar
         candidate_k : candidatos por cada rama (semántica + léxica)
+        tags        : si se provee, filtra documentos que tengan al menos uno de estos tags
     """
     engine = _get_engine()
     if not engine:
         return []
 
     # RBAC tag filter
-    tag_filter = "" if is_internal else "AND 'public' = ANY(tags)"
+    if tags:
+        # Agente con tags específicos: filtra por intersección
+        tags_sql = "AND tags && ARRAY[" + ",".join(f"'{t}'" for t in tags) + "]::VARCHAR[]"
+        tag_filter = tags_sql
+    else:
+        tag_filter = "" if is_internal else "AND 'public' = ANY(tags)"
 
     # ── 1. Búsqueda semántica (HNSW cosine) ───────────────────────────────
     semantic_results = {}
@@ -165,14 +172,14 @@ def _hybrid_search(
 
 # ── Herramientas de Function Calling ─────────────────────────────────────────
 
-def search_tool(query: str, is_internal: bool = False, top_k: int = 5) -> str:
+def search_tool(query: str, is_internal: bool = False, top_k: int = 5, tags: List[str] | None = None) -> str:
     """
     Busca en la base de datos vectorial interna de Gamma Ingenieros usando Hybrid Search
     (búsqueda semántica + léxica con fusión RRF). Retorna los fragmentos más relevantes
     del conocimiento corporativo: políticas, portafolio, servicios, procedimientos y clientes.
     Usar siempre que necesites información específica de Gamma Ingenieros.
     """
-    chunks = _hybrid_search(query, is_internal=is_internal, top_k=top_k)
+    chunks = _hybrid_search(query, is_internal=is_internal, top_k=top_k, tags=tags)
 
     if not chunks:
         scope = "intranet" if is_internal else "base pública"

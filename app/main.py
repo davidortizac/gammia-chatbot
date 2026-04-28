@@ -7,7 +7,7 @@ import os
 
 from app.core.config import settings
 from app.db.database import engine, Base
-from app.api.endpoints import chat, rag, analytics, widget, admin_auth, integrations
+from app.api.endpoints import chat, rag, analytics, widget, admin_auth, integrations, agents
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -89,12 +89,13 @@ async def _init_db():
         except Exception:
             pass
 
-    # Tx 5: patches en interaction_logs y widget_sessions
+    # Tx 5: patches en interaction_logs, widget_sessions y nuevas tablas del framework
     for stmt in [
         "ALTER TABLE interaction_logs ADD COLUMN IF NOT EXISTS session_id VARCHAR",
         "CREATE INDEX IF NOT EXISTS idx_interaction_logs_session_id ON interaction_logs (session_id)",
+        "ALTER TABLE interaction_logs ADD COLUMN IF NOT EXISTS agent_id VARCHAR",
+        "CREATE INDEX IF NOT EXISTS idx_interaction_logs_agent_id ON interaction_logs (agent_id)",
         "ALTER TABLE widget_sessions ADD COLUMN IF NOT EXISTS last_interaction_at TIMESTAMPTZ",
-        # Tabla de integraciones (creada por create_all, este patch es por si existe sin la columna)
         "CREATE TABLE IF NOT EXISTS integration_configs (id VARCHAR PRIMARY KEY, enabled BOOLEAN DEFAULT FALSE, config_json TEXT, updated_at TIMESTAMPTZ DEFAULT now())",
     ]:
         try:
@@ -142,6 +143,53 @@ async def _init_db():
             await session.commit()
             print(f"[GammIA] Admin por defecto creado: {settings.ADMIN_DEFAULT_EMAIL}")
 
+    # Seed: agentes del framework multi-agente
+    from app.db.models import AgentConfig
+    _default_agents = [
+        AgentConfig(
+            id="gammia",
+            name="GammIA",
+            area="Corporativo",
+            description="Agente principal de Gamma Ingenieros. Atiende clientes públicos e internos.",
+            system_prompt=(
+                "Eres GammIA, arquitecto senior de IA y asistente virtual de Gamma Ingenieros. "
+                "Tu correo corporativo es gammia@gammaingenieros.com. "
+                "Eres experto en ciberseguridad, proactivo y siempre con tono formal. "
+                "Protege la información de la intranet y resuelve problemas empresariales. "
+                "Responde siempre en español."
+            ),
+            greeting="¡Hola! Soy GammIA, asistente virtual de Gamma Ingenieros. ¿En qué puedo ayudarte hoy?",
+            avatar_url="/static/gammia-avatar.png",
+            rag_tags=None,
+            is_internal_only=False,
+            is_active=True,
+        ),
+        AgentConfig(
+            id="iris",
+            name="Iris",
+            area="Intranet",
+            description="Asistente de intranet de Gamma Ingenieros. Acceso exclusivo para colaboradores.",
+            system_prompt=(
+                "Eres Iris, asistente virtual de la intranet de Gamma Ingenieros. "
+                "Apoyas a los colaboradores internos con información de procesos, políticas y documentación corporativa. "
+                "Eres cercana, eficiente y precisa. Responde siempre en español. "
+                "Usa formato markdown cuando ayude a la claridad."
+            ),
+            greeting="¡Hola! Soy Iris, tu asistente de intranet. ¿En qué te puedo ayudar hoy?",
+            avatar_url="/static/gammia-avatar.png",
+            rag_tags=["intranet", "general"],
+            is_internal_only=True,
+            is_active=True,
+        ),
+    ]
+    async with AsyncSession(engine) as session:
+        for agent_data in _default_agents:
+            exists = await session.get(AgentConfig, agent_data.id)
+            if not exists:
+                session.add(agent_data)
+        await session.commit()
+        print("[GammIA] Agentes del framework inicializados: gammia, iris")
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
@@ -181,6 +229,7 @@ app.include_router(rag.router, prefix="/api/v1/rag", tags=["Vector RAG Sync"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Commercial Analytics"])
 app.include_router(widget.router, prefix="/api/v1/widget", tags=["Chatbot Widget"])
 app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["Integrations"])
+app.include_router(agents.router, prefix="/api/v1/agents", tags=["Agents Framework"])
 
 # Servir archivos estáticos (widget JS, demo page)
 static_dir = os.path.join(os.path.dirname(__file__), "..", "static")

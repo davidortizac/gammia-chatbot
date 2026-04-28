@@ -16,7 +16,8 @@ class InteractionLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
     user_id = Column(String, index=True)
-    session_id = Column(String, index=True, nullable=True)   # widget session tracking
+    session_id = Column(String, index=True, nullable=True)
+    agent_id = Column(String, index=True, nullable=True)     # which agent handled this interaction
     tokens_in = Column(Integer)
     tokens_out = Column(Integer)
     latency_ms = Column(Integer)
@@ -144,3 +145,33 @@ class IntegrationConfig(Base):
     enabled     = Column(Boolean, default=False)
     config_json = Column(Text, nullable=True)        # JSON con API keys, endpoints, etc.
     updated_at  = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class AgentConfig(Base):
+    """Registro de agentes/chatbots del framework multi-agente de Gamma Ingenieros."""
+    __tablename__ = "agent_configs"
+
+    id          = Column(String, primary_key=True)   # slug: gammia, iris, iris-rrhh
+    name        = Column(String, nullable=False, default="GammIA")
+    area        = Column(String, nullable=True)       # área de negocio: RRHH, Finanzas, etc.
+    description = Column(Text, nullable=True)
+
+    # Identity
+    system_prompt = Column(Text, nullable=True)
+    greeting      = Column(Text, nullable=True)
+    avatar_url    = Column(String, default="/static/gammia-avatar.png")
+
+    # RAG scope — None/vacío = acceso a todo el RAG según is_internal_only
+    rag_tags         = Column(ARRAY(String), nullable=True)
+    is_internal_only = Column(Boolean, default=True)
+
+    # LLM & RAG settings — None = heredar de WidgetConfig
+    model_id        = Column(String, nullable=True)
+    llm_temperature = Column(Float, nullable=True)
+    llm_top_p       = Column(Float, nullable=True)
+    llm_top_k       = Column(Integer, nullable=True)
+    rag_top_k       = Column(Integer, nullable=True)
+    max_interactions = Column(Integer, nullable=True)
+
+    is_active  = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

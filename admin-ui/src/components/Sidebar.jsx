@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Database, Wrench, MessageSquareCode, Users, LogOut, ShieldCheck, Shield } from 'lucide-react';
+import { LayoutDashboard, Database, Wrench, MessageSquareCode, Users, LogOut, ShieldCheck, Shield, Bot } from 'lucide-react';
 
 const SidebarItem = ({ icon, label, isActive, onClick }) => (
   <button
@@ -58,6 +58,12 @@ export default function Sidebar({ activeView, setActiveView, user, onLogout }) {
           label="Integraciones (Tools)"
           isActive={activeView === 'tools'}
           onClick={() => setActiveView('tools')}
+        />
+        <SidebarItem
+          icon={<Bot size={20} />}
+          label="Agentes & Chatbots"
+          isActive={activeView === 'agents'}
+          onClick={() => setActiveView('agents')}
         />
 
         {/* Separator */}

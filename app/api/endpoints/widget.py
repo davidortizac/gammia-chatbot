@@ -24,7 +24,7 @@ from app.core.config import settings
 from app.core.security import enforce_guardrails
 from app.core.auth import get_current_admin, get_db
 from app.db.database import engine
-from app.db.models import WidgetConfig, WidgetSession, InteractionLog
+from app.db.models import WidgetConfig, WidgetSession, InteractionLog, AgentConfig
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -94,6 +94,7 @@ class WidgetChatRequest(BaseModel):
     context: str = "public"
     session_id: Optional[str] = None
     widget_secret: Optional[str] = None
+    agent_id: Optional[str] = None      # slug del agente: gammia, iris, iris-rrhh…
     lang: str = "es"
 
 
@@ -174,7 +175,28 @@ async def widget_chat(
         )
 
     cfg = await _get_config(db)
-    max_interactions = cfg.max_interactions or 10
+
+    # Cargar configuración del agente si se especifica
+    agent: AgentConfig | None = None
+    if body.agent_id:
+        agent = await db.get(AgentConfig, body.agent_id)
+        if agent and not agent.is_active:
+            agent = None  # agente deshabilitado → fallback a GammIA
+
+    # Parámetros efectivos: agente tiene prioridad sobre WidgetConfig global
+    effective_max  = (agent.max_interactions if agent and agent.max_interactions else None) or cfg.max_interactions or 10
+    effective_model = (agent.model_id if agent and agent.model_id else None) or cfg.model_id or settings.MODEL_ID
+    effective_temp  = (agent.llm_temperature if agent and agent.llm_temperature is not None else None)
+    if effective_temp is None:
+        effective_temp = cfg.llm_temperature
+    effective_top_p = (agent.llm_top_p if agent and agent.llm_top_p is not None else None)
+    if effective_top_p is None:
+        effective_top_p = cfg.llm_top_p
+    effective_top_k = (agent.llm_top_k if agent and agent.llm_top_k is not None else None)
+    if effective_top_k is None:
+        effective_top_k = cfg.llm_top_k
+    effective_rag_top_k = (agent.rag_top_k if agent and agent.rag_top_k else None) or cfg.rag_top_k or 15
+    effective_rag_tags  = (agent.rag_tags if agent and agent.rag_tags else None)  # None = sin filtro de tags
 
     # Obtener o crear sesión
     sess_result = await db.execute(
@@ -189,18 +211,19 @@ async def widget_chat(
     current_count = sess.interaction_count or 0
 
     # Verificar límite
-    if current_count >= max_interactions:
+    if current_count >= effective_max:
+        agent_name = agent.name if agent else "GammIA"
         return WidgetChatResponse(
             reply=(
-                f"Has alcanzado el límite de {max_interactions} interacciones en esta sesión. "
-                "Para continuar, recarga la página o escríbenos a gammia@gammaingenieros.com"
+                f"Has alcanzado el límite de {effective_max} interacciones en esta sesión. "
+                f"Para continuar, recarga la página o escríbenos a gammia@gammaingenieros.com"
             ),
             session_id=session_id,
             context=body.context,
             source="limit",
             latency_ms=0,
             interaction_count=current_count,
-            max_interactions=max_interactions,
+            max_interactions=effective_max,
             limit_reached=True,
         )
 
@@ -212,9 +235,17 @@ async def widget_chat(
         from google.genai import types
         from app.agents.tools.gamma_tools import search_tool
 
-        rag_context = search_tool(body.message, is_internal=ctx["is_internal"], top_k=cfg.rag_top_k)
+        rag_context = search_tool(
+            body.message,
+            is_internal=ctx["is_internal"],
+            top_k=effective_rag_top_k,
+            tags=effective_rag_tags,
+        )
 
-        if ctx["is_internal"]:
+        # System prompt: agente > default por contexto
+        if agent and agent.system_prompt:
+            system = agent.system_prompt
+        elif ctx["is_internal"]:
             system = (
                 "Eres GammIA, asistente de IA de Gamma Ingenieros. "
                 "Tienes acceso completo a la base de conocimiento interna de la empresa. "
@@ -240,13 +271,13 @@ async def widget_chat(
 
         client = genai.Client(api_key=settings.GOOGLE_API_KEY)
         response = client.models.generate_content(
-            model=cfg.model_id or settings.MODEL_ID,
+            model=effective_model,
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system,
-                temperature=cfg.llm_temperature,
-                top_p=cfg.llm_top_p,
-                top_k=cfg.llm_top_k,
+                temperature=effective_temp,
+                top_p=effective_top_p,
+                top_k=effective_top_k,
                 max_output_tokens=4096,
             ),
         )
@@ -266,9 +297,11 @@ async def widget_chat(
     sess.interaction_count = new_count
     sess.last_interaction_at = datetime.now(timezone.utc)
 
+    effective_agent_id = agent.id if agent else body.agent_id or "gammia"
     log = InteractionLog(
         user_id=session_id,
         session_id=session_id,
+        agent_id=effective_agent_id,
         tokens_in=len(body.message.split()),
         tokens_out=len(reply.split()),
         latency_ms=latency_ms,
@@ -286,8 +319,8 @@ async def widget_chat(
         source=f"rag_{body.context}",
         latency_ms=latency_ms,
         interaction_count=new_count,
-        max_interactions=max_interactions,
-        limit_reached=(new_count >= max_interactions),
+        max_interactions=effective_max,
+        limit_reached=(new_count >= effective_max),
     )
 
 

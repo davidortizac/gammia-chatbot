@@ -7,6 +7,7 @@ import ToolsView from './views/ToolsView';
 import WidgetView from './views/WidgetView';
 import LoginView from './views/LoginView';
 import AdminUsersView from './views/AdminUsersView';
+import AgentsView from './views/AgentsView';
 
 const TOKEN_KEY = 'gammia_admin_token';
 const USER_KEY  = 'gammia_admin_user';
@@ -89,6 +90,7 @@ function App() {
           {activeView === 'rag'       && <RagView />}
           {activeView === 'widget'    && <WidgetView token={token} />}
           {activeView === 'tools'     && <ToolsView />}
+          {activeView === 'agents'    && <AgentsView token={token} />}
           {activeView === 'users'     && <AdminUsersView token={token} currentUser={user} />}
         </div>
       </main>
